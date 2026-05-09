@@ -5,12 +5,13 @@ The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer 2) 
 ## Main Features
 - Z80 CMOS running up to 10MHz
 - ATMega1284P for I/O
-- Ethernet (WizNet W5500) for remote (telnet) access and CBBS
-- Supercap-backed RAM for CP/M and Ramdisk
+- Ethernet (WizNet W5500) for remote (telnet) access and/or running CBBS software
+- Supercap-backed 512KB RAM (some of which used for a CP/M 3.0 Ramdisk)
+- Hardware watchdog
 - 3,3V I2C interface for small (128x64) OLED display
+- 8-24V power supply (as an alternative to USB power)
+- TTL serial I/O (as an alternative to USB data)
 - RC2014 expansion bus
-- 8V-24V power supply (as an alternative to USB power)
-- TTL serial I/O (as an alternative to USB)
 
 ## Repository Structure
 - `/Hardware`: Schematics (PDF) and Gerber files for PCB manufacturing
