@@ -1,5 +1,7 @@
 # Z80-MBC2-V
 
+**UNDER CONSTRUCTION**
+
 The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer 2) by Just4Fun.
 
 ## Main Features
@@ -16,7 +18,7 @@ The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer 2) 
 ## Repository Structure
 - `/Hardware`: Schematics (PDF) and Gerber files for PCB manufacturing
 - `/Firmware`: Source code for the ATMega1284P MCU
-- `/Software`: Disk Images, Utilities, Z80 assembly examples
+- `/Software`: Disk Images, Utilities
 - `/Docs`    : Technical documentation
 
 ## 🌐 Project Page
