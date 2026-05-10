@@ -1,4 +1,4 @@
-Z80-MBC2-V is fully compatible with original project's disk images.
+Z80-MBC2-V is fully compatible with original project's disk images.  
 Here you can find a copy of the original archive as long as custom replacements for some of the disk.
 
 
