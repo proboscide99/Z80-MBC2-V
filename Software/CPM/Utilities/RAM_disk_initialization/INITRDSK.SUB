@@ -1,0 +1,6 @@
+wiperdsk
+p:
+initdir p:
+set [create=on,update=on]
+set [name=RAMDISK]
+

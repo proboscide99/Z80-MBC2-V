@@ -1,0 +1,276 @@
+; RAMDISK Init per Z80-MBC2 (RAM 512K)
+; Configurare il banco RAM di partenza del RAMDISK alla EQU 'DISK_START_BANK'   (4)
+; Configurare il numero di entries di directory alla EQU 'DIR_ENTRIES'          (64)
+;
+; Scrive E5h sui primi 32*DIR_ENTRIES bytes (2KB) del primo banco.
+;
+
+        ORG 0100H
+
+START:
+;
+; Visualizza il valore di SP
+;
+        LD      HL, MSG_SP
+        CALL    PRINTSTR
+        LD HL,  0
+        ADD HL, SP
+        LD      (RELOC_ADDR), HL                ; salva la posizione dello stack
+        CALL    PRINTHL
+;
+; Se SP in memoria banked, esce
+;
+        LD      A, H
+        CP      80h
+        JR      NC, stackOK
+        LD HL,  MSG_TPAERROR
+        CALL    PRINTSTR
+        RET
+;
+; Stampa TPA
+;
+stackOK:
+        LD      HL, MSG_TPA
+        CALL    PRINTSTR
+        LD      HL,(TPA_END)                    ; end of free common memory (TPA)
+        CALL    PRINTHL
+;
+; Se TPA in memoria banked, esce
+;
+        LD      A, H
+        CP      80h
+        JR      NC, tpaOK
+        LD HL,  MSG_TPAERROR
+        CALL    PRINTSTR
+        RET
+;
+; Determina chi e' piu' in basso fra SP e TPA
+;
+tpaOK:
+        EX      DE, HL                          ; DE = TPA
+        LD      HL, (RELOC_ADDR)                ; HL = SP (attuale candidato a riferimento per la posizione di rilocazione)
+        AND     A
+        SBC     HL, DE                          ; Il TPA e' piu' basso dello SP? (improbabile)
+        JR      C, usaSP                        ; no: continua a usare lo SP come posizione di riferimento
+        EX      DE, HL
+        LD      (RELOC_ADDR), HL
+usaSP:
+;
+; Calcola posizione di rilocazione della routine di bank switch,
+; esegue la copia e stampa la posizione
+;
+        LD      HL, MSG_BANKSW_ADDRESS
+        CALL    PRINTSTR
+
+        LD      HL, (RELOC_ADDR)
+        DEC     H                               ; 256 bytes piu' in basso del piu' basso fra SP e TPA
+        LD      (RELOC_ADDR), HL
+        CALL    PRINTHL                         ; stampa la posizione
+
+        LD      A, H                            ; se posizione in zona banked, esce
+        CP      80h
+        JR      NC, relocOK
+        LD HL,  MSG_RELOCERROR
+        CALL    PRINTSTR
+        RET
+
+relocOK:
+        LD      A, ' '
+        CALL    OUT_CHAR
+        LD      A, '('
+        CALL    OUT_CHAR
+
+        EX      DE, HL                          ; DE = destinazione
+        LD      HL, BANK_SWITCH                 ; HL = sorgente
+        LD      BC, RELOC_END-BANK_SWITCH       ; BC = dimensioni
+        LD      A, C                            ; stampa le dimensioni della routine
+        CALL    PRINT_DEC_BYTE
+        LDIR                                    ; copia (riloca) la routine
+
+        LD      HL, MSG_FINERIGA
+        CALL    PRINTSTR
+;
+; Esegue l'operazione
+;
+        LD      A, I                            ; Copia IFF1 nel flag P/V
+        PUSH    AF                              ; Salva lo stato dei flag (incluso P/V) sullo stack
+        DI
+READ_BLOCK:
+        LD      HL, RETURN_ADDR
+        PUSH    HL
+        LD      HL, (RELOC_ADDR)
+        JP      (HL)                            ; CALL (RELOC_ADDR)
+RETURN_ADDR:
+        POP     AF                              ; Recupera lo stato precedente dei flag
+        JP      PO, noINT                       ; Se il flag P/V era 0 (Parity Odd), erano già disabilitati
+        EI                                      ; Se il flag P/V era 1, riabilita gli interrupt
+noINT:
+        RET
+
+;-------------------------------------------------------
+; --- Routine da rilocare in Common Area (> 7FFFh)   ---
+; Inizializza con 0E5h DIR_ENTRIES*32 bytes a partire
+; da inizio ramdisk (tutta la directory).
+; Distrugge AF, BC, DE, HL
+;-------------------------------------------------------
+BANK_SWITCH:
+        LD      A, IOS_GET_BANK
+        OUT     IOS_OPCODE_ADDR, A
+        IN      A, IOS_DATA_ADDR                ; A = current bank
+        PUSH    AF
+
+        LD      A, IOS_SET_BANK
+        OUT     IOS_OPCODE_ADDR, A
+        LD      A, DISK_START_BANK
+        OUT     IOS_DATA_ADDR, A
+
+        LD      HL, 0
+        LD      (HL), 0E5h
+        LD      DE, 1
+        LD      BC, DIR_ENTRIES*32
+        LDIR                                    ; inizializza 'DIR_ENTRIES' *32 bytes
+
+        LD      A, IOS_SET_BANK
+        OUT     IOS_OPCODE_ADDR, A
+        POP     AF
+        OUT     IOS_DATA_ADDR, A                ; torna al banco originario
+        RET
+RELOC_END:
+
+;-------------------------------------------------------
+; Stampa HL in HEX seguito da 'h'
+;-------------------------------------------------------
+PRINTHL:
+        LD A,   H
+        CALL    PRINT_HEX_BYTE                  ; stampa la posizione di fine TPA
+        LD A,   L
+        CALL    PRINT_HEX_BYTE
+        LD      A, 'h'
+        CALL    OUT_CHAR
+        RET
+
+;-------------------------------------------------------
+; Routine di stampa di una stringa via IOP
+;-------------------------------------------------------
+PRINTSTR:
+        LD      BC, (IOS_SERIALTX << 8) + IOS_OPCODE_ADDR;
+LprintStr:
+        LD      A, (HL)
+        CP      '$'
+        RET     Z
+        OUT     (C), B
+        OUT     (IOS_DATA_ADDR), A
+        INC     HL
+        JR      LprintStr
+
+;-------------------------------------------------------
+; --- Utility di stampa byte HEX ---
+;-------------------------------------------------------
+PRINT_HEX_BYTE:
+        PUSH    AF
+        RRCA
+        RRCA
+        RRCA
+        RRCA
+        CALL    HEX_DIGIT
+        POP     AF
+HEX_DIGIT:
+        AND     0FH
+        CP      10
+        JR      C, IS_NUM
+        ADD     A, 7
+IS_NUM: ADD     A, 30H
+OUT_CHAR:
+        PUSH    BC
+        LD      BC, (IOS_SERIALTX << 8) + IOS_OPCODE_ADDR;
+        OUT     (C), B
+        OUT     (IOS_DATA_ADDR), A
+        POP     BC
+        RET
+
+;-------------------------------------------------------
+; --- Utility di stampa byte DECIMALE (0-255) ---
+;-------------------------------------------------------
+PRINT_DEC_BYTE:
+        PUSH    BC
+        LD      C, A                            ; C = valore originale da elaborare
+
+        ; --- Centinaia ---
+        LD      B, 0                            ; Contatore cifre
+        LD      A, C
+CENT:   CP      100
+        JR      C, P_CENT                       ; Se < 100, passa oltre
+        SUB     100
+        INC     B
+        JR      CENT
+P_CENT: LD      C, A                            ; Salva il resto
+        LD      A, B
+        OR      A                               ; Se la cifra è 0...
+        JR      Z, DEC_TEN                      ; ...non stamparla (soppressione zeri iniziali)
+        ADD     A, '0'                          ; Converte in ASCII
+        CALL    OUT_CHAR
+
+        ; --- Decine ---
+DEC_TEN:
+        LD      B, 0
+        LD      A, C
+TEN:    CP      10
+        JR      C, P_TEN
+        SUB     10
+        INC     B
+        JR      TEN
+P_TEN:  LD      C, A                            ; Salva il resto (le unità)
+        LD      A, B
+        OR      A                               ; Se la cifra è 0...
+        JR      Z, PRINT_UNIT                   ; ...non stamparla (soppressione zeri iniziali)
+        ADD     A, '0'
+        CALL    OUT_CHAR
+
+        ; --- Unità ---
+PRINT_UNIT:
+        LD      A, C
+        ADD     A, '0'
+        CALL    OUT_CHAR
+
+        POP     BC
+        RET
+
+
+
+;-------------------------------------------------------
+; EQUATES
+;-------------------------------------------------------
+TPA_END         EQU 0006h                       ; pointer to CP/M TPA end
+
+IOS_OPCODE_ADDR EQU 1
+IOS_DATA_ADDR   EQU 0
+
+IOS_SERIALTX    EQU 1                           ; IOS serial TX opcode
+IOS_SET_BANK    EQU 0Dh                         ; IOS set bank
+IOS_GET_BANK    EQU 0C1h                        ; IOS get current bank
+
+DISK_START_BANK EQU 4
+DIR_ENTRIES     EQU 64
+
+;-------------------------------------------------------
+; DATA
+;-------------------------------------------------------
+MSG_SP 
+        DB 'Drive P: ERASER v1.00 - SP $'
+MSG_SPERROR 
+        DB 0DH, 0AH, 'SP in banked memory: aborting',0DH,0AH,'$'
+MSG_TPA 
+        DB ', TPA $'
+MSG_TPAERROR 
+        DB 0DH, 0AH, 'TPA in banked memory: aborting',0DH,0AH,'$'
+MSG_RELOCERROR 
+        DB 0DH, 0AH, 'No room for bank switch routine: aborting',0DH,0AH,'$'
+MSG_BANKSW_ADDRESS 
+        DB ', BANK SWITCH CODE AT $'
+MSG_FINERIGA 
+        DB ' BYTES)', 0DH, 0AH, '$'
+
+RELOC_ADDR      DS  2
+
+        END
+
