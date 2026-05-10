@@ -1,8 +1,6 @@
 Z80-MBC2-V is fully compatible with original project's disk images.  
 You can prepare your sd-card using the original archive, then replace some files when you want to get the additional features.  
 
-Here you can find a copy of the original archive as long as custom replacements for some of the disk.
-
 
 | File | Description |
 | :--- | :--- |
