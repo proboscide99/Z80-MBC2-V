@@ -6,6 +6,6 @@ You can prepare your sd-card using the original archive, then replace some files
 | :--- | :--- |
 | **SD-S220718-R290823-v2** | Original Z80-MBC2 disk images |
 | **DS2N00.DSK** | Replacement for CP/M 3.0 drive A: with custom BIOS (Telnet device, ramdisk) |
-| **CPMLDR.COM** | Replacement for CP/M 3.0 loader (placed in sd-card root directory) |
+| **CPMLDR.COM** | Replacement for CP/M 3.0 loader |
 | **DS2N07.DSK** | Replacement for CP/M 3.0 drive H: (custom BIOS development disk) |
 
