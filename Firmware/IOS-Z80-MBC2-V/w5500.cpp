@@ -10,7 +10,7 @@
 // v Aggiungere << 3 nelle tre formule dei block select ed eliminare i corrispondenti shift nelle wizWrite, wizRead, wizBurstWrite
 // v scrivere una wizRead16 che legga un dato a 16 bit in una sola transazione SPI
 // v scrivere una wizWrite16 che scriva un dato a 16 bit in una sola transazione SPI
-// - Riattivare il setup dei registri RTR0 e RCR?
+// v Riattivare il setup dei registri RTR0 e RCR?
 // v Allargare i buffer del wix5500 per usare almeno 4KB (ancora compatibile con 4 socket) se non 8KB (ok con gli attuali due socket utilizzati)?
 //
 
@@ -121,6 +121,23 @@
 #define SOCK_PPPOE          0x5F
 
 // ---------------------------------------------------------
+// Socket Command Register values (Sn_CR)
+// ---------------------------------------------------------
+#define CR_DISCON           0x08
+#define CR_CLOSE            0x10
+#define CR_SEND             0x20
+#define CR_RECV             0x40
+
+// ---------------------------------------------------------
+// PROXY state machine (real caller's IP detection)
+// ---------------------------------------------------------
+#define PROXYSTATE_IDLE     0
+#define PROXYSTATE_PARSING  1
+#define PROXYSTATE_PROXIED  2
+
+const char PROXY_MAGIC[] = "PROXY TCP";
+
+// ---------------------------------------------------------
 //  LOCAL FUNCTIONS
 // ---------------------------------------------------------
 static uint8_t wizRead(uint16_t, uint8_t);
@@ -143,6 +160,7 @@ static void w5500_disconnect(TelnetSession *);
 static void systemResetSafe(void);
 static void telnet_debug_regs(TelnetSession *);
 static void telnet_struct_init(void);
+static bool parse_ip_string(char*, uint8_t*);
 
 // ---------------------------------------------------------
 // VARIABLES
@@ -213,10 +231,10 @@ void w5500_init(void)
   wizBurstWrite(GAR0, 0x00, netcfg.gateway, 4);
 
   // Timeout (RTR) (*100us per cui 2000 = 200ms)
-//  wizWrite16(RTR0, 0x00, netcfg.tcpTimeout); 
+  wizWrite16(RTR0, 0x00, netcfg.tcpTimeout); 
 
   // Retries (RCR)
-//  wizWrite(RCR, 0x00, netcfg.retries);
+  wizWrite(RCR, 0x00, netcfg.retries);
 
   for (uint8_t i = 0; i < MAX_TELNET_SESSIONS; i++)
   {
@@ -246,13 +264,16 @@ static void telnet_struct_init(void)
     s->telnet_flags     = 0;
     s->iac_state        = 0;
     s->is_telnet        = false;
-    s->sent_banner      = false;
-    s->sent_iac         = true;                                                 // don't send IAC by default (set as already sent)
+    s->send_banner      = true;
+    s->send_iac         = false;                                                // don't send IAC by default
+    s->send_mini_iac    = false;
     s->last_rx_time     = millis();
     s->timeout_val      = (i == 0) ? (ZOMBIE_TIMEOUT << 2) : ZOMBIE_TIMEOUT;    // timeout quadruplo per il socket 0
 
     s->rx_head = s->rx_tail = 0;
     s->tx_head = s->tx_tail = 0;
+
+    s->proxy_state = PROXYSTATE_IDLE;
   }
 }
 
@@ -369,23 +390,37 @@ void telnet_handler(void)
                 s->sn, s->remoteIP[0], s->remoteIP[1], 
                 s->remoteIP[2], s->remoteIP[3]);
 #endif
+      // Proxy IP detection: is the client's IP equal to the configured PROXY IP?
+      if (s->remoteIP[0] == netcfg.trusted_proxy[0] && s->remoteIP[1] == netcfg.trusted_proxy[1] && 
+          s->remoteIP[2] == netcfg.trusted_proxy[2] && s->remoteIP[3] == netcfg.trusted_proxy[3]) 
+      {
+        // YES: we need to check for a 'PROXY Protocol V1 string' carrying the real client's IP
+#if DEBUG > 0
+        Serial.print("[PARSER] Proxy IP, parsing: ");
+#endif        
+        s->proxy_state = PROXYSTATE_PARSING;
+        s->proxy_ptr = 0;
+        s->proxy_space_count = 0;
+      }
+      else
+        s->proxy_state = PROXYSTATE_IDLE;
 
       s->last_rx_time = millis();
-      s->sent_banner = false;                                                     // banner will be sent
+      s->send_banner = true;                                                      // banner will be sent
       s->iac_state = 0;
       s->is_telnet = false;                                                       // by default, not a telnet client (raw client)
       s->telnet_flags &= ~TFLAG_DISCONNECT;                                       // clears any stale DISCONNECT REQUEST flag
 
       if (!(s->telnet_flags & TFLAG_FORCE_NEGO_C_M))                              // if IAC negotiation is not forced by 'TFLAG_FORCE_NEGO_C_M' flag:
       {
-        s->sent_iac = true;                                                       // we won't send IAC negotiation (mark as already sent)
-        
-        telnet_write_char(s, 0xFF);                                               // Sends IAC DO SUPPRESS-GO-AHEAD (0xFF 0xFD 0x03)
-        telnet_write_char(s, 0xFD);                                               // to see if a telnet client responds
-        telnet_write_char(s, 0x03);
+        s->send_iac = false;                                                      // we won't send the FULL IAC negotiation
+        s->send_mini_iac = true;                                                  // will send mini IAC (to probe telnet clients)
       }
       else
-        s->sent_iac = false;                                                      // IAC forced by 'TFLAG_FORCE_NEGO_C_M' flag
+      {
+        s->send_iac = true;                                                       // IAC forced by 'TFLAG_FORCE_NEGO_C_M' flag
+        s->send_mini_iac = false;
+      }
 
       if (s->telnet_flags & TFLAG_PURGETXONCONN)                                  // if option enabled,
       {                                                                           // purges the TX FIFO
@@ -409,11 +444,25 @@ void telnet_handler(void)
     s->last_state = st;
 
     // ---------------------------------------------------------
+    // PROXY PARSING TIMEOUT
+    // ---------------------------------------------------------
+    if (s->proxy_state == PROXYSTATE_PARSING)
+    {
+      if ((millis() - s->last_rx_time) > 1000)
+      {
+#if DEBUG > 0
+        Serial.println("--->timeout");
+#endif        
+        s->proxy_state = PROXYSTATE_IDLE;
+      }
+    }
+
+    // ---------------------------------------------------------
     //  AUTO-RECOVERY: socket state handling
     // ---------------------------------------------------------
 
     // CLOSED → LISTEN
-    if (st == 0x00)
+    if (st == SOCK_CLOSED)
     {
 #if DEBUG > 0
       Serial.print(F("[TELNET] CLOSED → LISTEN on socket "));
@@ -438,8 +487,8 @@ void telnet_handler(void)
       continue;
     }
 
-    // TIME_WAIT / FIN_WAIT → wait
-    if (st == 0x22 || st == 0x1B)
+    // closing
+    if (st == SOCK_CLOSING || st == SOCK_TIME_WAIT || st == SOCK_FIN_WAIT || st == SOCK_CLOSE_WAIT)
       continue;
 
     // ZOMBIE TIMEOUT / disconnect request
@@ -463,27 +512,43 @@ void telnet_handler(void)
     }
     else
     {
-//      s->sent_banner = false;
+//      s->send_banner = true;
       continue;
     }
 
     // ---------------------------------------------------------
     //  SEND character_mode negotiation IACs to telnet clients
     // ---------------------------------------------------------
-    if (!s->sent_iac)
+    if (s->send_iac && (s->proxy_state != PROXYSTATE_PARSING))
     {
 #if DEBUG > 0
       Serial.print(F("[TELNET] Sending IAC on socket "));
       Serial.println(s->sn);
 #endif
       telnet_negotiate_character_mode(s);                                         // client: immediate mode (don't wait for CR to send characters), no local echo
-      s->sent_iac = true;
+      s->send_iac = false;
+    }
+
+    // ---------------------------------------------------------
+    //  SEND IAC DO SUPPRESS-GO-AHEAD (mini IAC)
+    // ---------------------------------------------------------
+    if (s->send_mini_iac && (s->proxy_state != PROXYSTATE_PARSING))
+    {
+#if DEBUG > 0
+      Serial.print(F("[TELNET] Sending mini IAC on socket "));
+      Serial.println(s->sn);
+#endif
+      telnet_write_char(s, 0xFF);                                               // Sends IAC DO SUPPRESS-GO-AHEAD (0xFF 0xFD 0x03)
+      telnet_write_char(s, 0xFD);                                               // to see if a telnet client responds
+      telnet_write_char(s, 0x03);
+      s->send_mini_iac = false;
     }
 
     // ---------------------------------------------------------
     //  SEND BANNER ONCE (socket 0: only if BRIDGE is active)
     // ---------------------------------------------------------
-    if (!s->sent_banner && (s->sn > 0 || (s->telnet_flags & TFLAG_CON_BRIDGE)))
+    if ((s->send_banner && (s->sn > 0 || (s->telnet_flags & TFLAG_CON_BRIDGE))) &&
+        (s->proxy_state != PROXYSTATE_PARSING))
     {
       static const char banner_top[] = "\r\n"
         "*****************************************\r\n"
@@ -509,7 +574,7 @@ void telnet_handler(void)
       if (s->sn == 0)
         telnet_write_block(s, (const uint8_t*)TELNET_SPECIAL_CMDS, strlen(TELNET_SPECIAL_CMDS));
 
-      s->sent_banner = true;
+      s->send_banner = false;
     }
 
     // ---------------------------------------------------------
@@ -537,6 +602,107 @@ void telnet_handler(void)
       Serial.printf("TELNET RX: %02X  iac=%d  istelnet=%d  cmd=%d  flags=%d, socket=%d\r\n",
           b, s->iac_state, s->is_telnet, s->telnet_cmd_state, s->telnet_flags, s->sn);
 #endif
+
+      // ----------------------------------------------------------------
+      // PROXY PARSER:
+      //
+      // If the source IP matched the configured "Trusted Proxy",
+      // we may receive a PROXY Protocol V1 string with the real caller's
+      // IP address.
+      //
+      // The string from the proxy will be like:
+      // PROXY TCP6 95.255.175.42:52880-184 192.168.0.60 0 2301
+      //
+      // If a valid string is parsed, the IP will replace the content
+      // of 'remoteIP' and 'proxy_state' will be == 'PROXYSTATE_PROXIED'.
+      // ----------------------------------------------------------------
+      if (s->proxy_state == PROXYSTATE_PARSING)                                 // source IP matched the configured "Trusted Proxy IP"
+      {
+#if DEBUG > 0
+        if (b >=32 && b < 128)
+          Serial.printf("%c", b);                                               // prints the character being parsed
+#endif
+        if (s->proxy_ptr < strlen(PROXY_MAGIC) && s->proxy_space_count == 0)
+        {
+          if (b == PROXY_MAGIC[s->proxy_ptr])                                   // if character matches with the magic string,
+          {
+            s->proxy_ptr++;                                                     // advance pointer for next character
+          }
+          else                                                                  // mismatch: change state to IDLE so this character will be processed
+          {                                                                     // by the next stages (IAC parser, etc)
+            s->proxy_state = PROXYSTATE_IDLE;
+#if DEBUG > 0
+            Serial.println("--->mismatch");
+#endif
+          }
+        }
+        else if (s->proxy_space_count == 0)                                     // looks for next space
+        {
+          if (b == ' ')
+          {
+#if DEBUG > 0
+            Serial.print("[space]");
+#endif
+            s->proxy_space_count++;
+            s->proxy_ptr = 0;
+          }
+        }
+        else if (s->proxy_space_count == 1)                                     // IP capture phase
+        {
+          if (b == '.' || (b >= '0' && b <= '9'))
+          {
+            if (s->proxy_ptr < PROXYIPBUF_LEN)
+            {
+              s->proxy_ip_buf[s->proxy_ptr++] = b;
+            }
+          }
+          else if (b != ' ' || s->proxy_ptr > 0)
+          {
+#if DEBUG > 0
+            Serial.print("[IP_END]");
+#endif
+            s->proxy_ip_buf[s->proxy_ptr] = '\0';
+            s->proxy_space_count = 2;                                           // last phase
+          }
+        }
+
+        if (s->proxy_space_count == 2)
+        {
+          if (b == '\n')
+          {
+            s->proxy_state = PROXYSTATE_IDLE;                                   // assumes IP not parsed
+
+            if (s->proxy_ptr > 6)                                               // minimum "x.x.x.x"
+            {
+              uint8_t ipbuf[4];
+              if (parse_ip_string(s->proxy_ip_buf, ipbuf))
+              {
+                s->proxy_state = PROXYSTATE_PROXIED;                            // IP parsed!
+                s->remoteIP[0] = ipbuf[0]; s->remoteIP[1] = ipbuf[1]; s->remoteIP[2] = ipbuf[2]; s->remoteIP[3] = ipbuf[3];
+              }
+            }
+
+#if DEBUG > 0
+            if (s->proxy_state == PROXYSTATE_PROXIED)
+              Serial.printf("\r\n[PARSER] Proxied IP: %u.%u.%u.%u\r\n", s->remoteIP[0], s->remoteIP[1], s->remoteIP[2], s->remoteIP[3]);
+            else
+              Serial.println("\r\n[PARSER] Invalid IP string");
+#endif
+            rd++;
+            wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
+            wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
+            continue;
+          }
+        }
+
+        if (s->proxy_state == PROXYSTATE_PARSING)
+        {
+          rd++;
+          wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
+          wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
+          continue;
+        }
+      }
 
       // ----------------------------------------------------------------
       //  RAW MODE: quasi complete parser bypass
@@ -574,7 +740,7 @@ void telnet_handler(void)
 
         rd++;
         wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-        wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+        wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         continue;
       }
 /*
@@ -589,7 +755,7 @@ void telnet_handler(void)
         rd++;
         wizWrite(Sn_RX_RD,   S_REG(s->sn), rd >> 8);
         wizWrite(Sn_RX_RD+1, S_REG(s->sn), rd & 0xFF);
-        wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+        wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         continue;
       }
 */
@@ -606,7 +772,7 @@ void telnet_handler(void)
             if (!s->is_telnet)                                                // once,
             {
               if (!(s->telnet_flags & TFLAG_FORCE_NEGO_C_M))                  // if IAC not already sent by default,
-                s->sent_iac = false;                                          // clears the 'sent_iac' (IAC character mode negotiation will be sent)
+                s->send_iac = true;                                           // send it
 #if DEBUG > 0
               Serial.println(F("client is_telnet\r\n"));
 #endif
@@ -641,7 +807,7 @@ void telnet_handler(void)
 #endif
         rd++;
         wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-        wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+        wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         continue;
       }
 
@@ -681,12 +847,12 @@ void telnet_handler(void)
           rd++;
           rx--;
           wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-          wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+          wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         }
 
         rd++;
         wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-        wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+        wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         continue;
       }
 
@@ -742,7 +908,10 @@ void telnet_handler(void)
 
           Serial.printf("[TELNET] IOS Bridge socket %u ", s->sn);
           if (s->telnet_flags & TFLAG_CON_BRIDGE)
+          {
             Serial.println(F("Activated"));
+            telnet_sessions[0].rx_head = telnet_sessions[0].rx_tail;          // clears any previously received character
+          }
           else
             Serial.println(F("Deactivated"));
         }
@@ -751,7 +920,7 @@ void telnet_handler(void)
 
         rd++;
         wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-        wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+        wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
         continue;
       }
 
@@ -763,7 +932,7 @@ void telnet_handler(void)
 
       rd++;
       wizWrite16(Sn_RX_RD, S_REG(s->sn), rd);
-      wizWrite(Sn_CR, S_REG(s->sn), 0x40);
+      wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
     }
     if (safety == 0)
       Serial.printf("Safety counter RX loop Exit socket %u\r\n", s->sn);
@@ -771,6 +940,29 @@ void telnet_handler(void)
     if (!pushok)
       Serial.printf("FIFO Full RX loop Exit socket %u\r\n", s->sn);
   }
+}
+
+
+// ---------------------------------------------------------
+// Converts string to IP
+// ---------------------------------------------------------
+bool parse_ip_string(char* str, uint8_t* ip_array)
+{
+  char* ptr = str;
+  for (uint8_t i = 0; i < 4; i++)
+  {
+    ip_array[i] = (uint8_t)atoi(ptr);
+    ptr = strchr(ptr, '.');
+
+    if (i < 3)
+    {
+      if (!ptr)
+        return false;
+      ptr++;
+    }
+  }
+//  Serial.printf("parse string %s: %u.%u.%u.%u ", str, ip_array[0], ip_array[1], ip_array[2], ip_array[3]);
+  return true;
 }
 
 
@@ -827,7 +1019,11 @@ static void telnet_negotiate_character_mode(TelnetSession *s)
 
 
 // ---------------------------------------------------------
-//  RETURNS CLIENT STATUS
+//  RETURNS TRUE if a CLIENT is connected.
+//
+//  Returns FALSE if a proxy string parsing is in progress,
+//  because the reported client's IP may change when parsing
+//  completes.
 // ---------------------------------------------------------
 bool telnetClientConnected(uint8_t idx)
 {
@@ -835,7 +1031,8 @@ bool telnetClientConnected(uint8_t idx)
     return false;
 
   if (idx < MAX_TELNET_SESSIONS)
-    return (telnet_sessions[idx].last_state == SOCK_ESTABLISHED || telnet_sessions[idx].last_state == SOCK_CLOSE_WAIT);
+    return ((telnet_sessions[idx].last_state == SOCK_ESTABLISHED || telnet_sessions[idx].last_state == SOCK_CLOSE_WAIT) &&
+        telnet_sessions[idx].proxy_state != PROXYSTATE_PARSING);
   else
     return false;
 }
@@ -956,7 +1153,7 @@ static void telnet_write_block(TelnetSession *s, const uint8_t *buf, uint16_t le
   wizWrite16(Sn_TX_WR, S_REG(s->sn), wr);
 
   // SEND
-  wizWrite(Sn_CR, S_REG(s->sn), 0x20);
+  wizWrite(Sn_CR, S_REG(s->sn), CR_SEND);
   if (wait_command_done(s->sn))
     Serial.printf("[W5500] SEND timeout on socket %u\r\n", s->sn);
 }
@@ -986,7 +1183,7 @@ static void telnet_write_char(TelnetSession *s, uint8_t b)
   wr++;                                                                         // pointer update
   wizWrite16(Sn_TX_WR, S_REG(s->sn), wr);
 
-  wizWrite(Sn_CR, S_REG(s->sn), 0x20);                                          // SEND
+  wizWrite(Sn_CR, S_REG(s->sn), CR_SEND);                                       // SEND
 }
 
 
@@ -1047,19 +1244,19 @@ static void w5500_disconnect(TelnetSession *s)
 {
   Serial.printf("[W5500] Disconnecting socket %u\r\n", s->sn);
 
-  wizWrite(Sn_CR, S_REG(s->sn), 0x08);                                          // Sn_CR_DISCON (FIN)
+  wizWrite(Sn_CR, S_REG(s->sn), CR_DISCON);                                     // Sn_CR_DISCON (FIN)
   if (wait_command_done(s->sn))
     Serial.printf("[W5500] CR_DISCON timeout on socket %u\r\n", s->sn);
   else
   {
     uint32_t t0 = millis();
-    while (wizRead(Sn_SR, S_REG(s->sn)) != 0x00) {                              // wait for SOCK_CLOSED (1000ms timeout)
+    while (wizRead(Sn_SR, S_REG(s->sn)) != SOCK_CLOSED) {                       // wait for SOCK_CLOSED (1000ms timeout)
       if (millis() - t0 > 1000)
         break;
     }
   }
 
-  wizWrite(Sn_CR, S_REG(s->sn), 0x10);                                          // Sn_CR_CLOSE anyway
+  wizWrite(Sn_CR, S_REG(s->sn), CR_CLOSE);                                      // Sn_CR_CLOSE anyway
   if (wait_command_done(s->sn))
     Serial.printf("[W5500] CR_CLOSE timeout on socket %u\r\n", s->sn);
 }

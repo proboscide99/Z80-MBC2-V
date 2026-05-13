@@ -23,6 +23,8 @@
 #define NETCFG_MAGIC            42
 #define NETCFG_SOCK0_PWDLEN     20
 
+#define PROXYIPBUF_LEN          15
+
 #define ETH_CS_                 11        // PD3 pin 17   ETH SPI CHIP SELECT (active low)
 #define ETH_CS_PORT             PORTD     // ETH_CS_ port register
 #define ETH_CS_PIN              3
@@ -57,6 +59,7 @@ struct NetConfig {
     uint8_t ip[4];
     uint8_t netmask[4];
     uint8_t gateway[4];
+    uint8_t trusted_proxy[4];
     uint8_t dns1[4];
     uint8_t dns2[4];
     uint16_t tcpTimeout;
@@ -75,8 +78,9 @@ typedef struct {
     uint8_t   telnet_flags;
     uint8_t   iac_state;
     uint8_t   is_telnet;
-    uint8_t   sent_banner;
-    uint8_t   sent_iac;
+    uint8_t   send_banner;
+    uint8_t   send_iac;
+    uint8_t   send_mini_iac;
 
     // timeout
     uint32_t  last_rx_time;
@@ -92,6 +96,12 @@ typedef struct {
     uint16_t  tx_tail;
 
     uint8_t   remoteIP[4];
+
+    // proxy message parser state machine (real caller IP)
+    uint8_t proxy_state;                  // 0 = IDLE, 1 = PARSING, 2 = DONE
+    uint8_t proxy_ptr;
+    uint8_t proxy_space_count;
+    char proxy_ip_buf[PROXYIPBUF_LEN + 1];
 } TelnetSession;
 
 // ---------------------------------------------------------

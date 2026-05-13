@@ -175,7 +175,7 @@ S071225-R020126   Fixed a bug in the set baudrate function.
                   Two new opcodes has heen created to set/get 'telnet_flags' register to enable/disable features; by now, olny bit 0 is in use
                    (1 = RAW mode enabled).
                   When RAW mode is enabled, special commands and any other character handling is disabled to allow raw binary data flow.
-                  New telnet special command ~!~R that completely restarts the board (atmega soft reset).
+                  New telnet special command [pwd]R that completely restarts the board (atmega soft reset).
 
 S071225-R030126   New 'GETBANK' opcode that returns the number of the currently active ram bank, very useful for setting the ISR-safe bank.
                   Telnet RAW mode is automatically disabled when a client disconnects.
@@ -263,6 +263,10 @@ S071225-R010526   'SETTELNETFLAGS' (0x44) handler now always clears iac_state if
 
 S071225-R060526   Socket0 password now editable and EE-saved
 
+S071225-R130526   If a client connects through a proxy and a PROXY Protocol V1 string is received, the real client's IP is parsed and stored in place of proxy's IP.
+                   For this to work, the proxy's IP (LAN) should be configured as the "Trusted Proxy" in network configuration.
+                  Random cleanup.
+
 Tempi pre-modifiche controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -290,7 +294,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 --------------------------------------------------------------------------------- */
 
 #define   HW_REV        "A060126"
-#define   IO_SUBS       "S071225-R060526"
+#define   IO_SUBS       "S071225-R130526"
 
 // ------------------------------------------------------------------------------
 //
@@ -1514,7 +1518,7 @@ void loop()
       // Opcode 0xC4  TELNET RX S1    1           // get a byte from telnet socket 1
       // Opcode 0xC5  TELNET RX S2    1           // RESERVED for socket 2
       // Opcode 0xC6  TELNET RX S3    1           // RESERVED for socket 3
-      // Opcode 0xC7  ETH REMOTE IP   4           // get the IP address of the device connected to the selected socket (see SELTELNETSOCKET)
+      // Opcode 0xC7  ETH REMOTE IP   5           // get the IP address and proxy state of the device connected to the selected socket (see SELTELNETSOCKET)
       //
       // Opcode 0xFF  No operation    1
       //
@@ -1522,9 +1526,9 @@ void loop()
       // 
       // .........................................................................................................     
       {
-#if DEBUG > 1
+#if DEBUG > 0
         if (ioOpcode != 0xFF)
-          Serial.printf("[PROTO] WR OPCODE (OUT1), 0x%02X while ioOpcode = 0x%02X, ioByteCnt = %u\r\n", ioData, ioOpcode, ioByteCnt);
+          consolePrint("[PROTO] WR OPCODE (OUT1), 0x%02X while ioOpcode = 0x%02X, ioByteCnt = %u\r\n", ioData, ioOpcode, ioByteCnt);
 #endif
 #if DEBUG > 3
         if (ioOpcode != 0xFF)
@@ -2943,7 +2947,8 @@ void loop()
             //                                X  X  X  X  X  1  X  X    Chars available       session 1
             //                                X  X  X  X  0  X  X  X    No clients connected  session 1
             //                                X  X  X  X  1  X  X  X    A client is connected session 1
-            //                                [...] up to four sessions
+            //                                [...]
+            //                                1  X  X  X  0  X  X  X    A client is connected session 3
             //
             ioData = 0;
             for (uint8_t i = MAX_TELNET_SESSIONS; i > 0; --i)
@@ -3004,17 +3009,19 @@ void loop()
 // 0xC6 RESERVED for SOCKET 3
 
           case  0xC7:
-            // GET REMOTE IP
-            // ETH_REMOTE_IP - read 4 data bytes from the REMOTE IP register of currently selected socket
+            // ETH_REMOTE_IP - read 4 data bytes from the REMOTE IP register + 1 byte proxy state of currently selected socket
             //
-            //                 I/O DATA:   D7 D6 D5 D4 D3 D2 D1 D0
+            //                Bytes 0 - 3 = IP address of connected client
+            //                Byte 4      = proxy state: 0 = IP is not proxied; 1 = parsing proxy string in progress (invalid data in IP field); 2 = IP is proxied
             //
-            ioData = telnet_sessions[telnetSocketSel].remoteIP[ioByteCnt];
-
-            if (ioByteCnt >= 3) 
+            if (ioByteCnt < 4)
+              ioData = telnet_sessions[telnetSocketSel].remoteIP[ioByteCnt];
+            else
             {
+              ioData = telnet_sessions[telnetSocketSel].proxy_state;
               ioOpcode = 0xFF;                                  // All done. Set ioOpcode = "No operation"
             }
+
             ioByteCnt++;                                        // Increment the counter of the exchanged data bytes
           break;
 
@@ -3368,6 +3375,7 @@ void LoadNetworkConfig(void)
     netcfg.ip[0] = 192; netcfg.ip[1] = 168; netcfg.ip[2] = 0; netcfg.ip[3] = 60;
     netcfg.netmask[0] = 255; netcfg.netmask[1] = 255; netcfg.netmask[2] = 255; netcfg.netmask[3] = 0;
     netcfg.gateway[0] = 192; netcfg.gateway[1] = 168; netcfg.gateway[2] = 0; netcfg.gateway[3] = 1;
+    netcfg.trusted_proxy[0] = 0; netcfg.trusted_proxy[1] = 0; netcfg.trusted_proxy[2] = 0; netcfg.trusted_proxy[3] = 0;
     netcfg.dns1[0] = 8; netcfg.dns1[1] = 8; netcfg.dns1[2] = 8; netcfg.dns1[3] = 8;
     netcfg.dns2[0] = 1; netcfg.dns2[1] = 1; netcfg.dns2[2] = 1; netcfg.dns2[3] = 1;
     netcfg.tcpTimeout = 2000;
@@ -3377,6 +3385,9 @@ void LoadNetworkConfig(void)
 
     EEPROM.put(EEPROM_NETCFG_ADDR, netcfg);
   }
+
+  if (strlen(netcfg.sock0_password) > NETCFG_SOCK0_PWDLEN)                                            // if missing for any reason,
+    netcfg.sock0_password[NETCFG_SOCK0_PWDLEN] = '\0';                                                // adds the trailing NULL (array size is NETCFG_SOCK0_PWDLEN+1)
 }
 
 
@@ -3866,9 +3877,9 @@ void ChangeZ80Clock(void)
 
 
 // ============================================================
-// CHANGE NETWORK CONFIG
+// EDIT NETWORK CONFIGURATION
 // ============================================================
-#define NETWORKMENU_ROWS  9
+#define NETWORKMENU_ROWS  10
 bool ChangeNetworkConfig(void)
 {
   EEPROM.get(EEPROM_NETCFG_ADDR, netcfg);
@@ -3906,7 +3917,7 @@ bool ChangeNetworkConfig(void)
     }
     if (k == KEY_SAVE)
     {
-      // S = salva e esci
+      // S (uppercase) = save and exit
       consolePrint("\x1B[15;1HIOS: Type 'yes' to confirm         \r\n");
       uint8_t keySeq = 0;
       do
@@ -3935,40 +3946,44 @@ bool ChangeNetworkConfig(void)
       switch (cursor)
       {
         case 0:
-          EditMacInline(netcfg.mac, 0);
+          EditMacInline(netcfg.mac, cursor);
         break;
 
         case 1:
-          EditFieldInline(netcfg.ip, 4, 1);
+          EditFieldInline(netcfg.ip, 4, cursor);
         break;
 
         case 2:
-          EditFieldInline(netcfg.netmask, 4, 2);
+          EditFieldInline(netcfg.netmask, 4, cursor);
         break;
 
         case 3:
-          EditFieldInline(netcfg.gateway, 4, 3);
+          EditFieldInline(netcfg.gateway, 4, cursor);
         break;
 
         case 4:
-          EditFieldInline(netcfg.dns1, 4, 4);
+          EditFieldInline(netcfg.trusted_proxy, 4, cursor);
         break;
 
         case 5:
-          EditFieldInline(netcfg.dns2, 4, 5);
+          EditFieldInline(netcfg.dns1, 4, cursor);
         break;
 
         case 6:
-          consolePrint("\033[%u;%uH", 4 + cursor, 26);
-          netcfg.tcpTimeout = ReadNumberFromConsole(netcfg.tcpTimeout);
+          EditFieldInline(netcfg.dns2, 4, cursor);
         break;
 
         case 7:
           consolePrint("\033[%u;%uH", 4 + cursor, 26);
-          netcfg.retries = ReadNumberFromConsole(netcfg.retries);
+          netcfg.tcpTimeout = ReadNumberFromConsole(netcfg.tcpTimeout);
         break;
 
         case 8:
+          consolePrint("\033[%u;%uH", 4 + cursor, 26);
+          netcfg.retries = ReadNumberFromConsole(netcfg.retries);
+        break;
+
+        case 9:
           char tmpstr[NETCFG_SOCK0_PWDLEN+1];
           strcpy(tmpstr, netcfg.sock0_password);
           consolePrint("\033[%u;%uH", 4 + cursor, 26);
@@ -4120,11 +4135,12 @@ void RedrawRow(uint8_t rowIndex, uint8_t cursor, NetConfig *n)
     case 1: FormatIPv4(buf, n->ip); PrintRow(1, cursor, "IP Address", buf); break;
     case 2: FormatIPv4(buf, n->netmask); PrintRow(2, cursor, "Netmask", buf); break;
     case 3: FormatIPv4(buf, n->gateway); PrintRow(3, cursor, "Gateway", buf); break;
-    case 4: FormatIPv4(buf, n->dns1); PrintRow(4, cursor, "DNS1", buf); break;
-    case 5: FormatIPv4(buf, n->dns2); PrintRow(5, cursor, "DNS2", buf); break;
-    case 6: FormatNumber(buf, n->tcpTimeout); PrintRow(6, cursor, "TCP Timeout (ms)", buf); break;
-    case 7: FormatNumber(buf, n->retries); PrintRow(7, cursor, "Retries", buf); break;
-    case 8: PrintRow(8, cursor, "Socket0 Pwd", netcfg.sock0_password); break;
+    case 4: FormatIPv4(buf, n->trusted_proxy); PrintRow(4, cursor, "Trusted Proxy", buf); break;
+    case 5: FormatIPv4(buf, n->dns1); PrintRow(5, cursor, "DNS1", buf); break;
+    case 6: FormatIPv4(buf, n->dns2); PrintRow(6, cursor, "DNS2", buf); break;
+    case 7: FormatNumber(buf, n->tcpTimeout); PrintRow(7, cursor, "TCP Timeout (0.1ms)", buf); break;
+    case 8: FormatNumber(buf, n->retries); PrintRow(8, cursor, "Retries", buf); break;
+    case 9: PrintRow(9, cursor, "Socket0 Pwd", netcfg.sock0_password); break;
   }
 }
 
