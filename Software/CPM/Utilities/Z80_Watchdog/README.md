@@ -1,4 +1,4 @@
-This program handles the IOS Z80 Watchdog functionality.
+This program handles the IOS Z80 Watchdog functionality.  
 Watchdog can be set to restart the Z80 only or perform a full IOS menu-level restart.
 
 | File | Description |
