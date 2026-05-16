@@ -1,0 +1,237 @@
+        ORG     0100H
+
+BDOS    EQU     0005H
+DMA     EQU     0080H                   ; Command line tail length byte
+DMA_TXT EQU     0081H                   ; Command line text start address
+F_STR   EQU     09H                     ; BDOS function: Output string
+
+START:
+        LD      A, (DMA)                ; A = length of the command line
+        OR      A                       ; Is length equal to zero?
+        JP      Z, NO_ARGS              ; If zero, no arguments passed: jump to help/error
+
+        LD      B, A                    ; B = loop counter (number of characters to scan)
+        LD      HL, DMA_TXT             ; HL points to the first character of the command line text
+        
+PARSE_LOOP:
+        LD      A, (HL)                 ; Load current character
+        CP      13                      ; Carriage return? End of line.
+        JR      Z, EXECUTION_START
+        CP      ' '                     ; Skip spaces entirely
+        JR      Z, SKIP_CHAR
+        
+        CP      '-'                     ; Check for flag prefix
+        JR      Z, PROCESS_FLAG
+        
+        CP      '0'                     ; Check if it is a number
+        JR      C, SKIP_CHAR
+        CP      '9'+1
+        JR      NC, SKIP_CHAR
+
+        CALL    ASCII_TO_BIN    ; It's a number! Convert it (HL will point to the first non-number byte)
+        LD      (NUM_VALUE), DE
+        LD      A, B            ; check if line ended
+        OR      A
+        JR      Z, EXECUTION_START
+        JR      PARSE_LOOP
+
+PROCESS_FLAG:
+        INC     HL                      ; Advance past '-'
+        DEC     B
+        JR      Z, NO_ARGS              ; Error if trailing '-'
+        
+        LD      A, (HL)                 ; Get character after '-'
+        CP      'M'                     ;  BDOS converts to uppercase
+        JR      NZ, SKIP_CHAR           ; Unknown flag, just skip it
+        
+SET_HELP:
+        LD      A, 80H                  ; menu'-level reset flag
+        LD      (FLAG_H), A
+        JR      EXECUTION_START         ; jump to program execution
+
+SKIP_CHAR:
+        INC     HL                      ; Move to next character address
+        DJNZ    PARSE_LOOP              ; Loop until B reaches 0
+
+
+; =========================================================================
+EXECUTION_START:
+        LD      DE, MSG_RESET           ; selects watchdog-disable message by default
+
+        LD      HL, (NUM_VALUE)         ; Carica in HL il numero a 16 bit salvato dal parser
+        LD      A, H
+        JR      NZ, NO_ARGS
+        LD      A, L
+        AND     A
+        JR      Z, W_DO                 ; watchdog will be disabled
+        CP      128
+        JR      NC, NO_ARGS
+
+        LD      DE, MSG_SET             ; selects watchdog enable message
+        LD      A, (FLAG_H)
+        LD      H, A
+        AND     A
+        JR      Z, NOMENULEVEL
+        LD      DE, MSG_SETMEN          ; selects watchdog enable message for menu' level reset
+NOMENULEVEL:
+
+W_DO:
+        OR      L                       ; L = timeout, H (A) = menu-level flag
+        LD      BC, (IOS_SET_WDOG << 8) + IOS_OPCODE_ADDR
+        OUT     (C), B
+        DEC     C
+        OUT     (C), A
+        CPL
+        OUT     (C), A
+
+        PUSH    HL
+        LD      C, F_STR
+        CALL    BDOS
+
+        POP     HL
+        LD      A, L
+        AND     A
+        JR      Z, PRGEXIT
+
+        LD      D, 0
+        LD      E, L
+        CALL    MULDE10                 ; timeout is parameter *10 (sec)
+        CALL    PRINT_HL_DEC            ; prints the timeout (seconds)
+
+        LD      DE, MSG_SEC
+        LD      C, F_STR
+        CALL    BDOS
+        RET
+
+NO_ARGS:
+        LD      DE, MSG_HELP
+        LD      C, F_STR
+        CALL    BDOS
+PRGEXIT:
+        RET
+
+; =========================================================================
+; SUBROUTINE: ASCII_TO_BIN
+; Input:    HL = Points to the first digit of the ASCII number string
+;           B  = Remaining characters left in the command line
+; Output:   HL = Points to the first non-numerical byte
+;           DE = Converted 16-bit binary integer
+;           B  = Updated character counter after consumption
+; =========================================================================
+ASCII_TO_BIN:
+        LD      DE, 0                   ; DE will hold our partial conversion result
+A2B_LOOP:
+        LD      A, (HL)
+        CP      '0'
+        JR      C, A2B_DONE             ; If character is below '0', the number string has ended
+        CP      '9'+1
+        JR      NC, A2B_DONE            ; If character is above '9', the number string has ended
+
+        SUB     '0'                     ; Convert ASCII character ('0'-'9') to raw numeric value (0-9)
+        PUSH    HL                      ; Save current string pointer
+
+        CALL    MULDE10                 ; multiply DE by 10, result in HL
+        LD      E, A
+        LD      D, 0
+        ADD     HL, DE                  ; Add the newly parsed digit into HL
+        EX      DE, HL                  ; Move the updated total back into DE
+
+        POP     HL                      ; Restore the string pointer
+        INC     HL                      ; Advance to the next character in the string
+        DJNZ    A2B_LOOP                ; Loop if the command line buffer isn't empty yet
+
+A2B_DONE:
+        RET
+
+; =========================================================================
+; SUBROUTINE: PRINT_HL_DEC
+; Input:  HL = 16-bit binary integer to print (0-65535)
+; Destroys: A, B, C, DE, HL
+; =========================================================================
+PRINT_HL_DEC:
+        LD      IX, OUT_BUF_END         ; Punta alla fine del buffer di output
+        LD      (IX), '$'               ; Metti il terminatore di stringa del CP/M
+
+P_DEC_LOOP:
+        LD      C, 10                   ; Divisore
+        CALL    DIV16_8                 ; Divide HL per 10. Quoziente in HL, Resto in A
+        ADD     A, '0'                  ; Converti il resto (0-9) in carattere ASCII ('0'-'9')
+
+        DEC     IX                      ; Spostati indietro nel buffer
+        LD      (IX), A                 ; Salva la cifra nel buffer
+
+        ; Controlla se il quoziente in HL è diventato 0
+        LD      A, H
+        OR      L
+        JR      NZ, P_DEC_LOOP          ; Se HL non è 0, continua a estrarre le cifre
+
+        ; Ora IX punta alla prima cifra del numero convertito
+        PUSH    IX
+        POP     DE                      ; Sposta l'indirizzo di inizio stringa in DE
+        LD      C, F_STR
+        CALL    BDOS                    ; Chiama la funzione 09h del BDOS per stampare
+        RET
+
+; =========================================================================
+; SUBROUTINE: DIV16_8
+; Dividi un numero a 16 bit in HL per un divisore a 8 bit in C.
+; Input:  HL = Dividendo (16 bit)
+;         C  = Divisore  (8 bit)
+; Output: HL = Quoziente (16 bit)
+;         A  = Resto     (8 bit)
+; =========================================================================
+DIV16_8:
+        LD      A, 0                    ; Azzera il registro del resto
+        LD      B, 16                   ; Imposta il ciclo su 16 bit
+DVL:
+        ADD     HL, HL                  ; Sposta il bit piu' significativo di HL nel carry
+        RLA                             ; Ruota il carry dentro il resto (A)
+        CP      C                       ; Il resto in A e' maggiore o uguale al divisore in C?
+        JR      C, DVS                  ; Se minore, salta la sottrazione
+        SUB     C                       ; Sottrai il divisore dal resto
+        INC     L                       ; Imposta a 1 il bit meno significativo del quoziente
+DVS:
+        DJNZ    DVL                     ; Ripeti per tutti i 16 bit
+        RET
+
+; =========================================================================
+; SUBROUTINE: MULDE10
+; Multiply current DE value by 10 (DE = DE * 10), result in HL
+; =========================================================================
+MULDE10:
+        LD      H, D
+        LD      L, E                    ; HL = DE
+        ADD     HL, HL                  ; HL = DE * 2
+        ADD     HL, HL                  ; HL = DE * 4
+        ADD     HL, DE                  ; HL = DE * 5
+        ADD     HL, HL                  ; HL = DE * 10
+        RET
+
+
+;-------------------------------------------------------
+; EQUATES
+;-------------------------------------------------------
+IOS_OPCODE_ADDR EQU 1
+IOS_DATA_ADDR   EQU 0
+
+IOS_SET_WDOG    EQU 4Bh                 ; IOS set Z80 watchdog
+
+
+;-------------------------------------------------------
+; --- VARIABLES AND STATIC DATA ---
+;-------------------------------------------------------
+flag_h:     db  0                       ; 0 = flag absent, 1 = flag present
+num_value:  dw  0                       ; Stores the converted number (Range: 0-65535)
+
+msg_help:   db  13,10,"Usage: WDOGSET [timeout] [-M]",13,10
+            db  "Timeout: 1-127 (*10sec); 0 = watchdog disabled",13,10
+            db  "-M     : menu-level reset",13,10,"$"
+msg_set:    db  "Enabling Z80 reset watchdog, $"
+msg_setmen: db  "Enabling Z80 menu-level reset watchdog, $"
+msg_reset:  db  "Disabling Z80 watchdog",13,10,"$"
+msg_sec:    db  " seconds",13,10,"$"
+
+            ds  5                       ; Space reserved for up to 5 digits (0-65535)
+out_buf_end:db  0                       ; The terminator '$' will be written here
+        end start
+
