@@ -213,6 +213,8 @@ void w5500_init(void)
   if (!eth_ok)
     return;
 
+  telnet_struct_init();
+
   eth_ok = w5500_software_reset();
 
   if (!eth_ok)
@@ -242,8 +244,6 @@ void w5500_init(void)
     wizWrite(Sn_RXBUF_SIZE, S_REG(i), BUF_SIZE_4K);
     wizWrite(Sn_TXBUF_SIZE, S_REG(i), BUF_SIZE_4K);
   }
-
-  telnet_struct_init();
 
   for (uint8_t i = 0; i < MAX_TELNET_SESSIONS; i++)
     w5500_socket_listen(&telnet_sessions[i]);

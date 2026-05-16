@@ -267,12 +267,13 @@ S071225-R130526   If a client connects through a proxy and a PROXY Protocol V1 s
                    For this to work, the proxy's IP (LAN) should be configured as the "Trusted Proxy" in network configuration.
                   Random cleanup.
 
-S071225-R160526   Date / time of last Z80 watchdog reset is saved and displayed on OLED and console menu'.
-                  Console baud rate is also printed on OLED display, useful if you're unable to connect the serial port.
-                  Fixed a bug that prevented AUTOEXEC from running if menu was bypassed.
+S071225-R160526   Date / time of last Z80 watchdog reset is saved and displayed on OLED and console menu';
+                  Console baud rate is also printed on OLED display, useful if you're unable to connect the serial port;
+                  Fixed a bug that prevented AUTOEXEC from running if menu was bypassed;
+                  Fixed a bug that prevented RTC from being read if menu was bypassed.
 
 
-Tempi pre-modifiche controllo pin @8MHz:
+Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
 FUZIX    --> login    90 sec
@@ -572,6 +573,7 @@ const byte * const flahBootTable[1] PROGMEM = {boot_A_}; // Payload pointers tab
 
 struct RTC_St {
     byte  foundRTC;                       // Set to 1 if RTC is found, 0 otherwise
+    byte  OscStopFlag;                    // Set to 1 if oscillator stopped (unreliable time/date)
     byte  seconds, minutes, hours;
     byte  day, month, year;
     byte tempC;                           // Temperature (Celsius) encoded in two’s complement integer format
@@ -697,10 +699,10 @@ void printMsg1(void);
 byte WaitAndBlink(baudRecCheck);
 byte decToBcd(byte);
 byte bcdToDec(byte);
-void readRTC(RTC_St*);
-void writeRTC(RTC_St*);
-byte RTCCheck(void);
-void printDateTime(byte);
+void readRTC(RTC_St *);
+void writeRTC(RTC_St *);
+void RTCCheck(RTC_St *);
+void printDateTime(RTC_St *);
 void print2digit(byte);
 byte isLeapYear(byte);
 void ChangeRTC(void);
@@ -868,12 +870,16 @@ void setup()
 
   // ethernet init (sets 'eth_ok')
   w5500_check();
-
   if (eth_ok)
   {
     LoadNetworkConfig();
     w5500_init();
   }
+
+  // Check if RTC is present and initialize it as needed
+  RTCCheck(&rtcData);
+  if (rtcData.foundRTC)
+    readRTC(&rtcData);
 
   sysMenu(0);
 }
@@ -900,8 +906,8 @@ void sysMenu(uint8_t bootm)
 //
   Z80IntRx          = 0;
   Z80IntSysTick     = 0;
-  sysTickTime       = 100;                                                     // default 100ms INT tick
-  irqSafeBank       = 0xFF;                                                    // IRQ can be issued on any bank
+  sysTickTime       = 100;                                                    // default 100ms INT tick
+  irqSafeBank       = 0xFF;                                                   // IRQ can be issued on any bank
   ioOpcode          = 0xFF;
   SPPmode           = 0;
   SPPautofd         = 0;
@@ -988,7 +994,16 @@ void sysMenu(uint8_t bootm)
       consolePrint("IOS: Z80 clock set at %d.%02d MHz\r\n", (int)freq, (int)((freq - (int)freq) * 100));
 
       // Print RTC and GPIO informations if found
-      rtcData.foundRTC = RTCCheck();                                          // Check if RTC is present and initialize it as needed
+      if (rtcData.foundRTC)
+      {
+        consolePrint("IOS: Found RTC DS3231 Module (");
+        printDateTime(&rtcData);
+        consolePrint(" T=%dC)\r\n", (int8_t)rtcData.tempC);
+
+        if (rtcData.OscStopFlag)
+          consolePrint("IOS: RTC CLOCK POWER FAILED: DATA IS UNRELIABLE!\r\n");
+      }
+      
       if (moduleGPIO) consolePrint("IOS: Found GPE Option\r\n");
 
       // Print ethernet info if found
@@ -2215,35 +2230,35 @@ void loop()
               
               // Set STROBE and INIT at 1, and AUTOFD = !D0
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOA_REG);                                // Select GPIOA
-              Wire.write(0b00000101 | (byte) (SPPautofd << 1));     // Write value
+              Wire.write(GPIOA_REG);                                    // Select GPIOA
+              Wire.write(0b00000101 | (byte) (SPPautofd << 1));         // Write value
               Wire.endTransmission();
               
               // Set the GPIO port to work as an SPP port (direction and pullup)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(IODIRA_REG);                               // Select IODIRA
-              Wire.write(0b11111000);                               // Write value (1 = input, 0 = ouput)
+              Wire.write(IODIRA_REG);                                   // Select IODIRA
+              Wire.write(0b11111000);                                   // Write value (1 = input, 0 = ouput)
               Wire.endTransmission();
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(IODIRB_REG);                               // Select IODIRB 
-              Wire.write(0b00000000);                               // Write value (1 = input, 0 = ouput)
+              Wire.write(IODIRB_REG);                                   // Select IODIRB 
+              Wire.write(0b00000000);                                   // Write value (1 = input, 0 = ouput)
               Wire.endTransmission();
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPPUA_REG);                                // Select GPPUA
-              Wire.write(0b11111111);                               // Write value (1 = pullup enabled, 0 = pullup disabled)
+              Wire.write(GPPUA_REG);                                    // Select GPPUA
+              Wire.write(0b11111111);                                   // Write value (1 = pullup enabled, 0 = pullup disabled)
               Wire.endTransmission();
               
               // Initialize the printer using a pulse on INIT
               // NOTE: The I2C protocol introduces delays greater than needed by the SPP, so no further delay is used here to generate the pulse
-              byte tempByte = 0b00000001 | (byte) (SPPautofd << 1); // Change INIT bit to active (Low)
+              byte tempByte = 0b00000001 | (byte) (SPPautofd << 1);     // Change INIT bit to active (Low)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOA_REG);                                // Select GPIOA
-              Wire.write(tempByte);                                 // Set INIT bit to active (Low)
+              Wire.write(GPIOA_REG);                                    // Select GPIOA
+              Wire.write(tempByte);                                     // Set INIT bit to active (Low)
               Wire.endTransmission();
-              tempByte = tempByte | 0b00000100;                     // Change INIT bit to not active (High)
+              tempByte = tempByte | 0b00000100;                         // Change INIT bit to not active (High)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOA_REG);                                // Select GPIOA
-              Wire.write(tempByte);                                 // Set INIT bit to not active (High)
+              Wire.write(GPIOA_REG);                                    // Select GPIOA
+              Wire.write(tempByte);                                     // Set INIT bit to not active (High)
               Wire.endTransmission();
             }
           break;  
@@ -2262,22 +2277,22 @@ void loop()
             //
             // NOTE: to use WRSPP the SETSPP Opcode should be called first to activate the SPP mode of the GPIO port.
             
-            if (SPPmode)                                            // Only if SPP mode is active
+            if (SPPmode)                                                // Only if SPP mode is active
             {
               // NOTE: The I2C protocol introduces delays greater than needed by the SPP, so no further delay is used here to generate the pulse
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOB_REG);                                // Select GPIOB
-              Wire.write(ioData);                                   // Data on GPIOB
+              Wire.write(GPIOB_REG);                                    // Select GPIOB
+              Wire.write(ioData);                                       // Data on GPIOB
               Wire.endTransmission();
-              byte tempByte = 0b11111100 | (byte) (SPPautofd << 1); // Change STROBE bit to active (Low)
+              byte tempByte = 0b11111100 | (byte) (SPPautofd << 1);     // Change STROBE bit to active (Low)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOA_REG);                                // Select GPIOA
-              Wire.write(tempByte);                                 // Set STROBE bit to active (Low)
+              Wire.write(GPIOA_REG);                                    // Select GPIOA
+              Wire.write(tempByte);                                     // Set STROBE bit to active (Low)
               Wire.endTransmission();
-              tempByte = tempByte | 0b00000001;                     // Change STROBE bit to not active (High)
+              tempByte = tempByte | 0b00000001;                         // Change STROBE bit to not active (High)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.write(GPIOA_REG);                                // Select GPIOA
-              Wire.write(tempByte);                                 // Set STROBE bit to not active (High)
+              Wire.write(GPIOA_REG);                                    // Select GPIOA
+              Wire.write(tempByte);                                     // Set STROBE bit to not active (High)
               Wire.endTransmission();
             }
           break;
@@ -2445,19 +2460,19 @@ void loop()
             //                              X  X  X  X  X  X  X  X    RESET mask
             if (!ioByteCnt)
             {
-              gpioPortA_M |= ioData;                                      // first byte is the SET mask
+              gpioPortA_M |= ioData;                                    // first byte is the SET mask
               ++ioByteCnt;
             }
             else
             {
-              gpioPortA_M &= ~ioData;                                     // second byte is the RESET mask
-              ioOpcode = 0xFF;                                            // All done. Set ioOpcode = "No operation"
+              gpioPortA_M &= ~ioData;                                   // second byte is the RESET mask
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
 
               if (moduleGPIO) 
               {
                 Wire.beginTransmission(GPIOEXP_ADDR);
-                Wire.write(GPIOA_REG);                                    // Select GPIOA
-                Wire.write(gpioPortA_M);                                  // Write value
+                Wire.write(GPIOA_REG);                                  // Select GPIOA
+                Wire.write(gpioPortA_M);                                // Write value
                 Wire.endTransmission();
               }
             }
@@ -2471,19 +2486,19 @@ void loop()
             //                              X  X  X  X  X  X  X  X    RESET mask
             if (!ioByteCnt)
             {
-              gpioPortB_M |= ioData;                                      // first byte is the SET mask
+              gpioPortB_M |= ioData;                                    // first byte is the SET mask
               ++ioByteCnt;
             }
             else
             {
-              gpioPortB_M &= ~ioData;                                     // second byte is the RESET mask
-              ioOpcode = 0xFF;                                            // All done. Set ioOpcode = "No operation"
+              gpioPortB_M &= ~ioData;                                   // second byte is the RESET mask
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
 
               if (moduleGPIO) 
               {
                 Wire.beginTransmission(GPIOEXP_ADDR);
-                Wire.write(GPIOB_REG);                                    // Select GPIOB
-                Wire.write(gpioPortB_M);                                  // Write value
+                Wire.write(GPIOB_REG);                                  // Select GPIOB
+                Wire.write(gpioPortB_M);                                // Write value
                 Wire.endTransmission();
               }
             }
@@ -2497,15 +2512,15 @@ void loop()
             //                              X  X  X  X  X  X  X  X    inverted value
             if (!ioByteCnt)
             {
-              Z80Watchdog_tmp = ioData;                                   // first byte is the expire time and mode
+              Z80Watchdog_tmp = ioData;                                 // first byte is the expire time and mode
               Z80WatchDOG_time = 0;
               ++ioByteCnt;
             }
             else
             {
-              if (Z80Watchdog_tmp == (uint8_t)~ioData)                    // if value matches,
+              if (Z80Watchdog_tmp == (uint8_t)~ioData)                  // if value matches,
               {
-                Z80WatchDOG_time = Z80Watchdog_tmp;                       // sets the Z80 watchdog expire time (0 = disabled)
+                Z80WatchDOG_time = Z80Watchdog_tmp;                     // sets the Z80 watchdog expire time (0 = disabled)
                 Z80Watchdog_cnt = (Z80WatchDOG_time & 0x7F);
                 Z80Watchdog_prescaler = 0;
                 Z80watchdog_NOioOper = Z80watchdog_ioOper = false;
@@ -2525,7 +2540,7 @@ void loop()
               else
                 consolePrint("\r\n[Z80WDOG] setting error: %u, %u\r\n", Z80Watchdog_tmp, ioData);
 
-              ioOpcode = 0xFF;                                            // All done. Set ioOpcode = "No operation"
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
             }
           break;
 
@@ -2567,10 +2582,9 @@ void loop()
     // ----------------------------------------
       
     {
-//      ioAddress = digitalRead(AD0);               // Read Z80 address bus line AD0 (PC2)
-      ioAddress = (AD0_PORTIN & (1 << AD0_PIN));  // this way ioAddress gets the bit weight of the pin, but does not matter
-      ioData = 0;                                 // Clear input data buffer
-      if (ioAddress)                              // Check the I/O address (only AD0 is checked!)
+      ioAddress = (AD0_PORTIN & (1 << AD0_PIN));                        // this way ioAddress gets the bit weight of the pin, but does not matter
+      ioData = 0;                                                       // Clear input data buffer
+      if (ioAddress)                                                    // Check the I/O address (only AD0 is checked!)
       // .........................................................................................................
       //
       // AD0 = 1 (I/O read address = 0x01). SERIAL RX.
@@ -2605,7 +2619,7 @@ void loop()
         if (Serial.available() > 0)
         {
           ioData = Serial.read();
-          LastRxIsEmpty = 0;                      // Reset the "Last Rx char was empty" flag
+          LastRxIsEmpty = 0;                                            // Reset the "Last Rx char was empty" flag
         }
         // POP dalla RX FIFO telnet socket 0
         else if ((telnet_sessions[0].rx_head != telnet_sessions[0].rx_tail) && (telnet_sessions[0].telnet_flags & TFLAG_CON_BRIDGE))
@@ -2614,9 +2628,9 @@ void loop()
           telnet_sessions[0].rx_tail = (telnet_sessions[0].rx_tail + 1) % TELNET_BUF_SIZE;
           LastRxIsEmpty = 0;
         }
-        else LastRxIsEmpty = 1;                   // Set the "Last Rx char was empty" flag
-        digitalWrite(INT_, HIGH);                 // Reset the INT_ signal (if used)
-        irqStatus = irqStatus & B11111110;        // Reset the serial Rx IRQ status bit (see SYSIRQ Opcode) 
+        else LastRxIsEmpty = 1;                                         // Set the "Last Rx char was empty" flag
+        digitalWrite(INT_, HIGH);                                       // Reset the INT_ signal (if used)
+        irqStatus = irqStatus & B11111110;                              // Reset the serial Rx IRQ status bit (see SYSIRQ Opcode) 
         RxDoneFlag = 1;
       }
       else
@@ -2710,7 +2724,7 @@ void loop()
 
             uint8_t seravail;
             seravail = 0;
-            if (InputAvailable())                               // InputAvailable() takes into account the 'TFLAG_CON_BRIDGE' flag
+            if (InputAvailable())                                       // InputAvailable() takes into account the 'TFLAG_CON_BRIDGE' flag
               seravail = 4;
             ioData = autoexecFlag | (rtcData.foundRTC << 1) | seravail | ((LastRxIsEmpty > 0) << 3) 
                      | (cpmWarmBootFlg << 4);
@@ -2734,7 +2748,7 @@ void loop()
 
             if (rtcData.foundRTC)
             {
-              if (ioByteCnt == 0) readRTC(&rtcData);            // Read from RTC
+              if (ioByteCnt == 0) readRTC(&rtcData);                    // Read from RTC
               if (ioByteCnt < 7)
               // Send date/time (binary values) to Z80 bus
               {
@@ -2750,10 +2764,10 @@ void loop()
                 }
                 ioByteCnt++;
                 if (ioByteCnt >= 7)
-                  ioOpcode = 0xFF;                // All done. Set ioOpcode = "No operation"
+                  ioOpcode = 0xFF;                                      // All done. Set ioOpcode = "No operation"
               }
             }
-            else ioOpcode = 0xFF;                 // Nothing to do. Set ioOpcode = "No operation"
+            else ioOpcode = 0xFF;                                       // Nothing to do. Set ioOpcode = "No operation"
           break;
 
           case  0x85:
@@ -3652,63 +3666,49 @@ void writeRTC(RTC_St *r)
 
 // ------------------------------------------------------------------------------
 
-byte RTCCheck(void)
+void RTCCheck(RTC_St *r)
 // Check if the DS3231 RTC is present and set the date/time at compile date/time if 
 // the RTC "Oscillator Stop Flag" is set (= date/time failure).
 // Return value: 0 if RTC not present, 1 if found.
 {
-  byte    OscStopFlag;
+  r->foundRTC = 0;
 
   Wire.beginTransmission(DS3231_RTC);
   if (Wire.endTransmission() != 0)
-    return 0;                                     // RTC not found
+    return;                                       // RTC not found
 
-  consolePrint("IOS: Found RTC DS3231 Module (");
-  printDateTime(1);
-  consolePrint(" T=%dC)\r\n", (int8_t)rtcData.tempC);
+  r->foundRTC = 1;
 
   // Read the "Oscillator Stop Flag"
   Wire.beginTransmission(DS3231_RTC);
   Wire.write(DS3231_STATRG);                      // Set the DS3231 Status Register
   Wire.endTransmission();
   Wire.requestFrom(DS3231_RTC, 1);
-  OscStopFlag = Wire.read() & 0x80;               // Read the "Oscillator Stop Flag"
-
-  if (OscStopFlag)
-    consolePrint("IOS: RTC CLOCK POWER FAILED: DATA IS UNRELIABLE!\r\n");
+  r->OscStopFlag = Wire.read() & 0x80;            // Read the "Oscillator Stop Flag"
 
   // Enable 1Hz output on INT_/SQW
   Wire.beginTransmission(DS3231_RTC);
   Wire.write(DS3231_CONTRG);                      // SQW enabled, 1Hz, default value for remaining bits
   Wire.write(0x00);
   Wire.endTransmission();
-
-  return 1;
 }
 
 // ------------------------------------------------------------------------------
 
-void printDateTime(byte readSourceFlag)
-// Print to serial the current date/time from the global variables.
-//
-// Flag readSourceFlag [0..1] usage:
-//    If readSourceFlag = 0 the RTC read is not done
-//    If readSourceFlag = 1 the RTC read is done (global variables are updated)
+// Print to serial the current date/time
+void printDateTime(RTC_St *r)
 {
-  if (readSourceFlag)
-    readRTC(&rtcData);
-
-  print2digit(rtcData.day);
+  print2digit(r->day);
   consolePrint("/");
-  print2digit(rtcData.month);
+  print2digit(r->month);
   consolePrint("/");
-  print2digit(rtcData.year);
+  print2digit(r->year);
   consolePrint(" ");
-  print2digit(rtcData.hours);
+  print2digit(r->hours);
   consolePrint(":");
-  print2digit(rtcData.minutes);
+  print2digit(r->minutes);
   consolePrint(":");
-  print2digit(rtcData.seconds);
+  print2digit(r->seconds);
 }
 
 // ------------------------------------------------------------------------------
@@ -3884,7 +3884,7 @@ void ChangeRTC(void)
   writeRTC(&rtcData);
   consolePrint(" ...done      \r\n\r\n");
   consolePrint("IOS: RTC date/time updated (");
-  printDateTime(1);
+  printDateTime(&rtcData);
   consolePrint(")\r\n");
 }
 
