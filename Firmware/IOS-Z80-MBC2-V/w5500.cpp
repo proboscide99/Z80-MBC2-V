@@ -554,6 +554,11 @@ void telnet_handler(void)
         "*****************************************\r\n"
         "*         Welcome to Z80_MBC2-V         *\r\n";
 
+      static const char banner_running[] =
+        "*                                       *\r\n"
+        "*  If you get no prompt, the processor  *\r\n"
+        "* might not be listening on this socket *\r\n";
+
       static const char banner_halted[] =
         "*             Z80 is Halted             *\r\n";
 
@@ -569,6 +574,8 @@ void telnet_handler(void)
       telnet_write_block(s, (const uint8_t*)banner_top, strlen(banner_top));
       if (inTheMenu != 0)
         telnet_write_block(s, (const uint8_t*)banner_halted, strlen(banner_halted));
+      else
+        telnet_write_block(s, (const uint8_t*)banner_running, strlen(banner_running));
       telnet_write_block(s, (const uint8_t*)banner_bottom, strlen(banner_bottom));
 
       if (s->sn == 0)

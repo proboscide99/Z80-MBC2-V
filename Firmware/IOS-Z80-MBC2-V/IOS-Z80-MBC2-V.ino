@@ -267,6 +267,11 @@ S071225-R130526   If a client connects through a proxy and a PROXY Protocol V1 s
                    For this to work, the proxy's IP (LAN) should be configured as the "Trusted Proxy" in network configuration.
                   Random cleanup.
 
+S071225-R160526   Date / time of last Z80 watchdog reset is saved and displayed on OLED and console menu'.
+                  Console baud rate is also printed on OLED display, useful if you're unable to connect the serial port.
+                  Fixed a bug that prevented AUTOEXEC from running if menu was bypassed.
+
+
 Tempi pre-modifiche controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -294,7 +299,8 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 --------------------------------------------------------------------------------- */
 
 #define   HW_REV        "A060126"
-#define   IO_SUBS       "S071225-R130526"
+#define   IO_SUBS_BEGIN "S071225"
+#define   IO_SUBS_END   "R160526"
 
 // ------------------------------------------------------------------------------
 //
@@ -438,15 +444,16 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 //
 // ------------------------------------------------------------------------------
 
-#define   EEPROM_NETCFG_ADDR      10
+#define   EE_Z80WATCHDOG_ADDR     0                 // Internal EEPROM address for Z80 watchdog counter's structure
+#define   EEPROM_NETCFG_ADDR      10                // Internal EEPROM address for Network Configuration's structure
+//
 #define   EE_BOOTMODE_ADDR        100               // Internal EEPROM address for boot mode storage
-#define   EE_AUTOEXECFLAG_ADDR    102               // Internal EEPROM address for AUTOEXEC flag storage
-#define   EE_CLOCKDIVIDER_ADDR    103               // Internal EEPROM address for the Z80 clock speed divider
-#define   EE_DISKSET_ADDR         104               // Internal EEPROM address for the current Disk Set [0..9]
-#define   EE_SERBAUD_ADDR         105               // Internal EEPROM address for the current serial speed index
-#define   EE_DEFBANK_ADDR         106               // Internal EEPROM address for default ram bank at power-on
-#define   EE_REMEMBERLASTSEL_ADDR 107               // Internal EEPROM address for last menu selection flag
-#define   EE_Z80WATCHDOG_CNT_ADDR 108               // Internal EEPROM address for Z80 watchdog reset occurrences
+#define   EE_AUTOEXECFLAG_ADDR    101               // Internal EEPROM address for AUTOEXEC flag storage
+#define   EE_CLOCKDIVIDER_ADDR    102               // Internal EEPROM address for the Z80 clock speed divider
+#define   EE_DISKSET_ADDR         103               // Internal EEPROM address for the current Disk Set [0..9]
+#define   EE_SERBAUD_ADDR         104               // Internal EEPROM address for the current serial speed index
+#define   EE_DEFBANK_ADDR         105               // Internal EEPROM address for default ram bank at power-on
+#define   EE_REMEMBERLASTSEL_ADDR 106               // Internal EEPROM address for last menu selection flag
 
 // ------------------------------------------------------------------------------
 //
@@ -507,7 +514,7 @@ const byte    JP_nn            =  0xC3;       // Z80 instruction: JP nn
 const String  compTimeStr      = __TIME__;    // Compile timestamp string
 const String  compDateStr      = __DATE__;    // Compile datestamp string
 const byte    daysOfMonth[]    = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-const DWORD   baudIndex[]      = {600, 1200, 2400, 4800, 9600, 19200, 28800, 38400, 57600, 115200};
+const uint32_t baudIndex[]     = {600, 1200, 2400, 4800, 9600, 19200, 28800, 38400, 57600, 115200};
 const byte    maxBaudIndex     = 10;          // Max number of serial speed values
 const byte    maxDiskNum       = 99;          // Max number of virtual disks
 const byte    maxDiskSet       = 6;           // Number of configured Disk Sets
@@ -558,6 +565,25 @@ const byte  boot_A_[] PROGMEM = {         // Payload A image (S200718 iLoad)
 
 const byte * const flahBootTable[1] PROGMEM = {boot_A_}; // Payload pointers table (flash)
 
+
+// ------------------------------------------------------------------------------
+//  STRUCTURES
+// ------------------------------------------------------------------------------
+
+struct RTC_St {
+    byte  foundRTC;                       // Set to 1 if RTC is found, 0 otherwise
+    byte  seconds, minutes, hours;
+    byte  day, month, year;
+    byte tempC;                           // Temperature (Celsius) encoded in two’s complement integer format
+};
+
+struct Z80_WDOG_St {                      // max size = 10 bytes (see 'EE_Z80WATCHDOG_ADDR')
+    uint32_t count;                       // wdog event occurrences
+    byte  seconds, minutes, hours;        // time of last occurrence
+    byte  day, month, year;
+};
+
+
 // ------------------------------------------------------------------------------
 //
 //  Global variables
@@ -607,11 +633,10 @@ byte          Z80Watchdog_prescaler;
 bool          Z80watchdog_ioOper;
 bool          Z80watchdog_NOioOper;
 
+Z80_WDOG_St   Z80wdog_counters;
 
 // DS3231 RTC variables
-byte          foundRTC;                   // Set to 1 if RTC is found, 0 otherwise
-byte          seconds, minutes, hours, day, month, year;
-byte          tempC;                      // Temperature (Celsius) encoded in two’s complement integer format
+RTC_St        rtcData;
 
 // SD disk and CP/M support variables
 FATFS         filesysSD;                  // Filesystem object (PetitFS library)
@@ -660,6 +685,7 @@ byte          bufferDISP[10];
 byte          gpioPortA_M = 0;
 byte          gpioPortB_M = 0;
 
+
 // ------------------------------------------------------------------------------
 //  FUNCTION PROTOTYPES
 // ------------------------------------------------------------------------------
@@ -671,8 +697,8 @@ void printMsg1(void);
 byte WaitAndBlink(baudRecCheck);
 byte decToBcd(byte);
 byte bcdToDec(byte);
-void readRTC(byte *, byte *, byte *, byte *, byte *, byte *, byte *);
-void writeRTC(byte, byte, byte, byte, byte, byte);
+void readRTC(RTC_St*);
+void writeRTC(RTC_St*);
 byte RTCCheck(void);
 void printDateTime(byte);
 void print2digit(byte);
@@ -772,7 +798,13 @@ void setup()
     diskSet = 0;
   }
 
-  Serial.begin(baudIndex[EEPROM.read(EE_SERBAUD_ADDR)]);
+  // Read the Z80 watchdog-reset counter and date/time
+  EEPROM.get(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
+  if (Z80wdog_counters.count == 0xFFFFFFFF)
+    Z80wdog_counters.count = 0;
+
+  uint32_t baudrate = baudIndex[EEPROM.read(EE_SERBAUD_ADDR)];
+  Serial.begin(baudrate);
   delay(500);
 
   // Initialize the I2C bus, 400kHz
@@ -783,15 +815,30 @@ void setup()
   disp_ok = sh1106_init();
   if (disp_ok)
   {
+    char dispP[22];
+
     sh1106_clear();
     sh1106_registerFont(&font6x8);
-    sh1106_write_string(0,0,"Z80_MBC2-V");
-    sh1106_write_string(80,0,HW_REV);
-    sh1106_write_string(0,2,"I/O");
-    sh1106_write_string(24,2,IO_SUBS);
-    sh1106_write_string(0,6,"Build");
-    sh1106_write_string(0,7,__DATE__);
-    sh1106_write_string(80,7,__TIME__);
+
+    sprintf(dispP, "%s - %s", HW_REV, IO_SUBS_END);
+    sh1106_write_string(0, 0, dispP);
+
+    sprintf(dispP, "Baudrate  %lu", baudrate);
+    sh1106_write_string(0, 1, dispP);
+
+    sprintf(dispP, "Z80 Wdog  %lu", Z80wdog_counters.count);
+    sh1106_write_string(0, 3, dispP);
+    if (Z80wdog_counters.count > 0)
+    {
+      sprintf(dispP, "(%02u/%02u/%02u %02u:%02u:%02u)",
+          Z80wdog_counters.day, Z80wdog_counters.month, Z80wdog_counters.year,
+          Z80wdog_counters.hours, Z80wdog_counters.minutes, Z80wdog_counters.seconds);
+      sh1106_write_string(0, 4, dispP);
+    }
+
+    sh1106_write_string(0, 6, "Build");
+    sh1106_write_string(0, 7, __DATE__);
+    sh1106_write_string(80, 7, __TIME__);
   }
   
   // Initialize the EXP_PORT (I2C) and search for "known" optional modules
@@ -832,6 +879,10 @@ void setup()
 }
 
 
+// ------------------------------------------------------------------------------
+//  SYSTEM MENU
+//  Parameter: 0 = cold boot
+// ------------------------------------------------------------------------------
 void sysMenu(uint8_t bootm)
 {
 // ------------------------------------------------------------------------------
@@ -841,7 +892,7 @@ void sysMenu(uint8_t bootm)
   char          minBootChar     = '1';      // Minimum allowed ASCII value selection (boot selection)
   char          maxSelChar      = '9'+1;    // Maximum allowed ASCII value selection (boot selection)
   byte          maxBootMode     = 4;        // Default maximum allowed value for bootMode [0..4]
-  byte          bootSelection   = 0;        // Flag to enter into the boot mode selection
+  byte          userKeyPressed  = 0;        // Flag to enter into the boot mode selection
   byte          rememberLastSel = 0;
 
 //
@@ -896,25 +947,30 @@ void sysMenu(uint8_t bootm)
 
   // Check USER Key for boot mode changes 
   pinMode(USER, INPUT_PULLUP);                                                // Read USER Key to enter into the boot mode selection
-  if (!digitalRead(USER)) bootSelection = 1;
+  if (!digitalRead(USER)) userKeyPressed = 1;
   pinMode(USER, OUTPUT);                                                      // USER led OFF
   digitalWrite(USER, HIGH);
 
   rememberLastSel = EEPROM.read(EE_REMEMBERLASTSEL_ADDR);
-  if (rememberLastSel == 0xFF)
+  if (rememberLastSel > 1)
     rememberLastSel = 0;
+
+   autoexecFlag = EEPROM.read(EE_AUTOEXECFLAG_ADDR);                          // Read the previous stored AUTOEXEC flag
+   if (autoexecFlag > 1)
+     autoexecFlag = 0;
 
   // ----------------------------------------
   // BOOT SELECTION AND SYS PARAMETERS MENU
   // ----------------------------------------
 
-  if (bootm == 0 && rememberLastSel)                                          // if invoked from cold start and option is enabled,
+  if (rememberLastSel)                                                        // if option is enabled,
     bootMode = EEPROM.read(EE_BOOTMODE_ADDR);                                 // Read the previous stored boot mode
   else
     bootMode = 255;                                                           // otherwise invalidate the value to display the menu
 
-  if ((bootSelection == 1 ) || (bootMode > maxBootMode))
-  // Enter in the boot selection menu if USER key was pressed at startup 
+  if ((userKeyPressed == 1 ) || (bootMode > maxBootMode) || bootm == 1)
+  // Enter in the boot selection menu if USER key was pressed at startup
+  //   or menu invoked from telnet management socket
   //   or an invalid bootMode code was read from internal EEPROM
   {
     uint8_t inCh;
@@ -922,7 +978,7 @@ void sysMenu(uint8_t bootm)
     do
     {
       // Print some system information
-      consolePrint("\r\n\nZ80_MBC2-V - %s\r\nIOS - I/O Subsystem - %s\r\n\r\n", HW_REV, IO_SUBS);
+      consolePrint("\r\n\nZ80_MBC2-V - %s\r\nIOS - I/O Subsystem - %s-%s\r\n\r\n", HW_REV, IO_SUBS_BEGIN, IO_SUBS_END);
 
       // Print if the input serial buffer is 128 bytes wide (this is needed for xmodem protocol support)
       if (SERIAL_RX_BUFFER_SIZE >= 128) consolePrint("IOS: Found extended serial Rx buffer (%u bytes)\r\n", SERIAL_RX_BUFFER_SIZE);
@@ -932,7 +988,7 @@ void sysMenu(uint8_t bootm)
       consolePrint("IOS: Z80 clock set at %d.%02d MHz\r\n", (int)freq, (int)((freq - (int)freq) * 100));
 
       // Print RTC and GPIO informations if found
-      foundRTC = RTCCheck();                                                  // Check if RTC is present and initialize it as needed
+      rtcData.foundRTC = RTCCheck();                                          // Check if RTC is present and initialize it as needed
       if (moduleGPIO) consolePrint("IOS: Found GPE Option\r\n");
 
       // Print ethernet info if found
@@ -944,16 +1000,22 @@ void sysMenu(uint8_t bootm)
 
       // Print CP/M Autoexec on cold boot status
       consolePrint("IOS: CP/M Autoexec is ");
-      if (EEPROM.read(EE_AUTOEXECFLAG_ADDR) > 1) EEPROM.update(EE_AUTOEXECFLAG_ADDR, 0);  // Reset AUTOEXEC flag to OFF if invalid
-      autoexecFlag = EEPROM.read(EE_AUTOEXECFLAG_ADDR);                                   // Read the previous stored AUTOEXEC flag
-      if (autoexecFlag) consolePrint("ON");
-      else consolePrint("OFF");
+      if (autoexecFlag)
+        consolePrint("ON");
+      else
+        consolePrint("OFF");
 
-      consolePrint("\r\nIOS: Remember last Selection is ");
+      consolePrint("\r\nIOS: Remember last Menu Selection is ");
       if (rememberLastSel) consolePrint("ON");
       else consolePrint("OFF");
 
-      consolePrint("\r\nIOS: Z80 watchdog reset counter: %u\r\n", EEPROM.read(EE_Z80WATCHDOG_CNT_ADDR));
+      consolePrint("\r\nIOS: Z80 watchdog reset counter: %lu", Z80wdog_counters.count);
+      if (Z80wdog_counters.count == 0)
+        consolePrint("\r\n");
+      else
+        consolePrint(" (%02u/%02u/%02u %02u:%02u:%02u)\r\n",
+            Z80wdog_counters.day, Z80wdog_counters.month, Z80wdog_counters.year,
+            Z80wdog_counters.hours, Z80wdog_counters.minutes, Z80wdog_counters.seconds);
 
       FlushSerials();                                                         // flush serial (always) and telnet (if bridge is enabled)
 
@@ -962,7 +1024,7 @@ void sysMenu(uint8_t bootm)
       // Previous valid boot mode read, so enable '0' selection
       {
         minBootChar = '0';
-        consolePrint(" 0: No change (%u)\r\n", bootMode + 1);
+        consolePrint(" 0: Recall Last Selection (%u)\r\n", bootMode + 1);
       }
       consolePrint(" 1: Basic\r\n");
       consolePrint(" 2: Forth\r\n");
@@ -976,13 +1038,16 @@ void sysMenu(uint8_t bootm)
       else consolePrint("OFF");
       consolePrint(")\r\n");
       consolePrint(" 8: Set serial port speed  (%lu)\r\n", baudIndex[EEPROM.read(EE_SERBAUD_ADDR)]);
-      consolePrint(" 9: Set Initial RAM Bank   (%u)\r\n", currentBank);
+      consolePrint(" 9: Set Initial RAM Bank   (%u)", currentBank);
+      if (currentBank != DEFAULT_RAM_BANK)
+        consolePrint(" (WARNING: default is %u)", DEFAULT_RAM_BANK);
+      consolePrint("\r\n");
       consolePrint(" A: Toggle Remember Sel.   (->");
       if (!rememberLastSel) consolePrint("ON)");
       else consolePrint("OFF)");
       consolePrint("\r\n");
       // If RTC module is present add a menu choice
-      if (foundRTC)
+      if (rtcData.foundRTC)
       {
         consolePrint(" B: Set RTC time/date\r\n");
         maxSelChar = '9'+2;
@@ -2440,12 +2505,21 @@ void loop()
             {
               if (Z80Watchdog_tmp == (uint8_t)~ioData)                    // if value matches,
               {
-                Z80WatchDOG_time = Z80Watchdog_tmp;     // sets the Z80 watchdog (0 = disabled)
+                Z80WatchDOG_time = Z80Watchdog_tmp;                       // sets the Z80 watchdog expire time (0 = disabled)
                 Z80Watchdog_cnt = (Z80WatchDOG_time & 0x7F);
                 Z80Watchdog_prescaler = 0;
                 Z80watchdog_NOioOper = Z80watchdog_ioOper = false;
 #if DEBUG > 0
-                consolePrint("\r\n[Z80WDOG] set to %u secs\r\n", Z80Watchdog_cnt*10);
+                consolePrint("\r\n[Z80WDOG] set to %u secs ", Z80Watchdog_cnt*10);
+                if (Z80Watchdog_cnt > 0)
+                {
+                  if (Z80WatchDOG_time & 0x80)
+                    consolePrint("(Menu_restart-level Reset)\r\n");
+                  else
+                    consolePrint("(Z80-level Reset)\r\n");
+                }
+                else
+                  consolePrint("(Disabled)\r\n");
 #endif
               }
               else
@@ -2638,7 +2712,7 @@ void loop()
             seravail = 0;
             if (InputAvailable())                               // InputAvailable() takes into account the 'TFLAG_CON_BRIDGE' flag
               seravail = 4;
-            ioData = autoexecFlag | (foundRTC << 1) | seravail | ((LastRxIsEmpty > 0) << 3) 
+            ioData = autoexecFlag | (rtcData.foundRTC << 1) | seravail | ((LastRxIsEmpty > 0) << 3) 
                      | (cpmWarmBootFlg << 4);
           break;
 
@@ -2658,21 +2732,21 @@ void loop()
             // NOTE 2: Overread data (more then 7 bytes read) will be = 0
             // NOTE 3: The temperature (Celsius) is a byte with two complement binary format [-128..127]
 
-            if (foundRTC)
+            if (rtcData.foundRTC)
             {
-              if (ioByteCnt == 0) readRTC(&seconds, &minutes, &hours, &day, &month, &year, &tempC); // Read from RTC
+              if (ioByteCnt == 0) readRTC(&rtcData);            // Read from RTC
               if (ioByteCnt < 7)
               // Send date/time (binary values) to Z80 bus
               {
                 switch (ioByteCnt)
                 {
-                  case 0: ioData = seconds; break;
-                  case 1: ioData = minutes; break;
-                  case 2: ioData = hours; break;
-                  case 3: ioData = day; break;
-                  case 4: ioData = month; break;
-                  case 5: ioData = year; break;
-                  case 6: ioData = tempC; break;
+                  case 0: ioData = rtcData.seconds; break;
+                  case 1: ioData = rtcData.minutes; break;
+                  case 2: ioData = rtcData.hours; break;
+                  case 3: ioData = rtcData.day; break;
+                  case 4: ioData = rtcData.month; break;
+                  case 5: ioData = rtcData.year; break;
+                  case 6: ioData = rtcData.tempC; break;
                 }
                 ioByteCnt++;
                 if (ioByteCnt >= 7)
@@ -3193,10 +3267,10 @@ void loop()
 //
         if (Z80WatchDOG_time > 0)
         {
-          if (Z80watchdog_NOioOper && Z80watchdog_ioOper)       // if a non-stale I/O operation occurred,
+          if (Z80watchdog_NOioOper && Z80watchdog_ioOper)         // if a non-stale I/O operation occurred,
           {
             Z80Watchdog_prescaler = 0;
-            Z80Watchdog_cnt = (Z80WatchDOG_time & 0x7F);        // feeds the watchdog
+            Z80Watchdog_cnt = (Z80WatchDOG_time & 0x7F);          // feeds the watchdog
             Z80watchdog_NOioOper = Z80watchdog_ioOper = false;
           }
           else
@@ -3209,8 +3283,18 @@ void loop()
               --Z80Watchdog_cnt;
               if (Z80Watchdog_cnt == 0)                           // time expired:
               {
-                uint8_t wcnt = EEPROM.read(EE_Z80WATCHDOG_CNT_ADDR);
-                EEPROM.write(EE_Z80WATCHDOG_CNT_ADDR, wcnt +1);
+                ++Z80wdog_counters.count;                         // increments Z80 watchdog events counter
+
+                readRTC(&rtcData);
+                Z80wdog_counters.seconds = rtcData.seconds;
+                Z80wdog_counters.minutes = rtcData.minutes;
+                Z80wdog_counters.hours = rtcData.hours;
+                Z80wdog_counters.day = rtcData.day;
+                Z80wdog_counters.month = rtcData.month;
+                Z80wdog_counters.year = rtcData.year;
+
+                EEPROM.put(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
+
                 if (Z80WatchDOG_time & 0x80)                      // if D7 of watchdog setting is SET,
                   sysMenu(0);                                     // restarts the menu
                 else
@@ -3523,7 +3607,7 @@ byte bcdToDec(byte val)
 
 // ------------------------------------------------------------------------------
 
-void readRTC(byte *second, byte *minute, byte *hour, byte *day, byte *month, byte *year, byte *tempC)
+void readRTC(RTC_St *r)
 // Read current date/time binary values and the temprerature (2 complement) from the DS3231 RTC
 {
   byte    i;
@@ -3532,31 +3616,31 @@ void readRTC(byte *second, byte *minute, byte *hour, byte *day, byte *month, byt
   Wire.endTransmission();
   // Read from RTC and convert to binary
   Wire.requestFrom(DS3231_RTC, 18);
-  *second = bcdToDec(Wire.read() & 0x7f);
-  *minute = bcdToDec(Wire.read());
-  *hour = bcdToDec(Wire.read() & 0x3f);
+  r->seconds = bcdToDec(Wire.read() & 0x7f);
+  r->minutes = bcdToDec(Wire.read());
+  r->hours = bcdToDec(Wire.read() & 0x3f);
   Wire.read();                                    // Jump over the DoW
-  *day = bcdToDec(Wire.read());
-  *month = bcdToDec(Wire.read());
-  *year = bcdToDec(Wire.read());
+  r->day = bcdToDec(Wire.read());
+  r->month = bcdToDec(Wire.read());
+  r->year = bcdToDec(Wire.read());
   for (i = 0; i < 10; i++) Wire.read();           // Jump over 10 registers
-  *tempC = Wire.read();
+  r->tempC = Wire.read();
 }
 
 // ------------------------------------------------------------------------------
 
-void writeRTC(byte second, byte minute, byte hour, byte day, byte month, byte year)
+void writeRTC(RTC_St *r)
 // Write given date/time binary values to the DS3231 RTC
 {
   Wire.beginTransmission(DS3231_RTC);
   Wire.write(DS3231_SECRG);                       // Set the DS3231 Seconds Register
-  Wire.write(decToBcd(seconds));
-  Wire.write(decToBcd(minutes));
-  Wire.write(decToBcd(hours));
+  Wire.write(decToBcd(r->seconds));
+  Wire.write(decToBcd(r->minutes));
+  Wire.write(decToBcd(r->hours));
   Wire.write(1);                                  // Day of week not used (always set to 1 = Sunday)
-  Wire.write(decToBcd(day));
-  Wire.write(decToBcd(month));
-  Wire.write(decToBcd(year));
+  Wire.write(decToBcd(r->day));
+  Wire.write(decToBcd(r->month));
+  Wire.write(decToBcd(r->year));
   Wire.endTransmission();
 
   // Reset the "Oscillator Stop Flag"
@@ -3581,7 +3665,7 @@ byte RTCCheck(void)
 
   consolePrint("IOS: Found RTC DS3231 Module (");
   printDateTime(1);
-  consolePrint(" T=%dC)\r\n", (int8_t)tempC);
+  consolePrint(" T=%dC)\r\n", (int8_t)rtcData.tempC);
 
   // Read the "Oscillator Stop Flag"
   Wire.beginTransmission(DS3231_RTC);
@@ -3612,19 +3696,19 @@ void printDateTime(byte readSourceFlag)
 //    If readSourceFlag = 1 the RTC read is done (global variables are updated)
 {
   if (readSourceFlag)
-    readRTC(&seconds, &minutes, &hours, &day,  &month,  &year, &tempC);
+    readRTC(&rtcData);
 
-  print2digit(day);
+  print2digit(rtcData.day);
   consolePrint("/");
-  print2digit(month);
+  print2digit(rtcData.month);
   consolePrint("/");
-  print2digit(year);
+  print2digit(rtcData.year);
   consolePrint(" ");
-  print2digit(hours);
+  print2digit(rtcData.hours);
   consolePrint(":");
-  print2digit(minutes);
+  print2digit(rtcData.minutes);
   consolePrint(":");
-  print2digit(seconds);
+  print2digit(rtcData.seconds);
 }
 
 // ------------------------------------------------------------------------------
@@ -3656,7 +3740,7 @@ void ChangeRTC(void)
   char    inCharl;
 
   // Read RTC
-  readRTC(&seconds, &minutes, &hours, &day,  &month,  &year, &tempC);
+  readRTC(&rtcData);
 
   // Change RTC date/time from keyboard
   byte tempByte = 0;
@@ -3671,32 +3755,32 @@ void ChangeRTC(void)
       {
         case 0:
           consolePrint("Year -> ");
-          print2digit(year);
+          print2digit(rtcData.year);
         break;
         
         case 1:
           consolePrint("Month -> ");
-          print2digit(month);
+          print2digit(rtcData.month);
         break;
 
         case 2:
           consolePrint("             \r Day -> ");
-          print2digit(day);
+          print2digit(rtcData.day);
         break;
 
         case 3:
           consolePrint("Hours -> ");
-          print2digit(hours);
+          print2digit(rtcData.hours);
         break;
 
         case 4:
           consolePrint("Minutes -> ");
-          print2digit(minutes);
+          print2digit(rtcData.minutes);
         break;
 
         case 5:
           consolePrint("Seconds -> ");
-          print2digit(seconds);
+          print2digit(rtcData.seconds);
         break;
       }
 
@@ -3711,40 +3795,40 @@ void ChangeRTC(void)
         switch (tempByte)
         {
           case 0:
-            year++;
-            if (year > 99) year = 0;
+            rtcData.year++;
+            if (rtcData.year > 99) rtcData.year = 0;
           break;
 
           case 1:
-            month++;
-            if (month > 12) month = 1;
+            rtcData.month++;
+            if (rtcData.month > 12) rtcData.month = 1;
           break;
 
           case 2:
-            day++;
-            if (month == 2)
+            rtcData.day++;
+            if (rtcData.month == 2)
             {
-              if (day > (daysOfMonth[month - 1] + isLeapYear(year))) day = 1;
+              if (rtcData.day > (daysOfMonth[rtcData.month - 1] + isLeapYear(rtcData.year))) rtcData.day = 1;
             }
             else
             {
-              if (day > (daysOfMonth[month - 1])) day = 1;
+              if (rtcData.day > (daysOfMonth[rtcData.month - 1])) rtcData.day = 1;
             }
           break;
 
           case 3:
-            hours++;
-            if (hours > 23) hours = 0;
+            rtcData.hours++;
+            if (rtcData.hours > 23) rtcData.hours = 0;
           break;
 
           case 4:
-            minutes++;
-            if (minutes > 59) minutes = 0;
+            rtcData.minutes++;
+            if (rtcData.minutes > 59) rtcData.minutes = 0;
           break;
 
           case 5:
-            seconds++;
-            if (seconds > 59) seconds = 0;
+            rtcData.seconds++;
+            if (rtcData.seconds > 59) rtcData.seconds = 0;
           break;
         }
       if (inCharl == '-')
@@ -3752,41 +3836,41 @@ void ChangeRTC(void)
         switch (tempByte)
         {
           case 0:
-            if (year == 0) year = 99;
-            else year--;
+            if (rtcData.year == 0) rtcData.year = 99;
+            else rtcData.year--;
           break;
 
           case 1:
-            if (month == 1) month = 12;
-            else month--;
+            if (rtcData.month == 1) rtcData.month = 12;
+            else rtcData.month--;
           break;
 
           case 2:
-            if (month == 2)
+            if (rtcData.month == 2)
             {
-              if (day == 1) day = daysOfMonth[month - 1] + isLeapYear(year);
-              else day--;
+              if (rtcData.day == 1) rtcData.day = daysOfMonth[rtcData.month - 1] + isLeapYear(rtcData.year);
+              else rtcData.day--;
             }
             else
             {
-              if (day == 1) day = daysOfMonth[month - 1];
-              else day--;
+              if (rtcData.day == 1) rtcData.day = daysOfMonth[rtcData.month - 1];
+              else rtcData.day--;
             }
           break;
 
           case 3:
-            if (hours == 1) hours = 23;
-            else hours--;
+            if (rtcData.hours == 1) rtcData.hours = 23;
+            else rtcData.hours--;
           break;
 
           case 4:
-            if (minutes == 1) minutes = 59;
-            else minutes--;
+            if (rtcData.minutes == 1) rtcData.minutes = 59;
+            else rtcData.minutes--;
           break;
 
           case 5:
-            if (seconds == 1) seconds = 59;
-            else seconds--;
+            if (rtcData.seconds == 1) rtcData.seconds = 59;
+            else rtcData.seconds--;
           break;
         }
       consolePrint("\r");
@@ -3797,7 +3881,7 @@ void ChangeRTC(void)
   while (tempByte < 6);  
 
   // Write new date/time into the RTC
-  writeRTC(seconds, minutes, hours, day, month, year);
+  writeRTC(&rtcData);
   consolePrint(" ...done      \r\n\r\n");
   consolePrint("IOS: RTC date/time updated (");
   printDateTime(1);

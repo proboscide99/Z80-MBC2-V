@@ -54,7 +54,7 @@
 // STRUCTURES
 // ---------------------------------------------------------
 
-struct NetConfig {
+struct NetConfig {                        // check EE available space (EEPROM_NETCFG_ADDR) (90 bytes) when adding members
     uint8_t mac[6];
     uint8_t ip[4];
     uint8_t netmask[4];
