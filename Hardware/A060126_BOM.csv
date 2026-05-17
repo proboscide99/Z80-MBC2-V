@@ -1,0 +1,93 @@
+Reference,Qty,Value,Footprint,Source
+"C1,C5,C14,C15,C16,C17,C19,C21,C22,C23,C24,C25,C26,C27,C28,C32,C34,C36,C38,C39,C40,C41,C42,C43",24,220nF 50V,0603_1608Metric,
+C2,1,47uF 35V,6.3x5.9,
+C3,1,10uF 35V,1206_3216Metric,
+C4,1,FG0H475ZF,Supercapacitor FG0H475ZF,https://www.mouser.it/ProductDetail/KEMET/FG0H475ZF?qs=98WN%2FnWUQiQ21tWcPMcRpQ%3D%3D&srsltid=AfmBOoqiox2Ij7BuRkTnPLcsf51ksA7mv_8ifHqN6cBC0BG9IP8y9Zzq
+"C6,C9,C12,C35",4,100nF 50V,0603_1608Metric,
+"C7,C8",2,22uF 10V,1206_3216Metric,
+"C10,C11",2,22pF,0603_1608Metric,
+"C13,C29,C30,C31,C37",5,10uF 10V,0805_2012Metric,
+C18,1,10pF 50V,0603_1608Metric,
+C20,1,47pF 50V,0603_1608Metric,
+C33,1,1uF 10V,0603_1608Metric,
+"D1,D5,D6,D10",4,1PS76SB70_115,SOD-323F,https://www.mouser.it/ProductDetail/Nexperia/1PS76SB70115?qs=P62ublwmbi%252BV7zpLU0e%252BsA%3D%3D&srsltid=AfmBOopR2RgiGpLywLKY0wmbyC5XVUpmGVMAlSEuc6ERr5JMGtBZ1a91
+D2,1,PMEG6030EVP,SOD-128,https://www.mouser.it/ProductDetail/Nexperia/PMEG6030EVP-QX?qs=e8oIoAS2J1Rz8Ztu31J6Bg%3D%3D
+"D3,D8,D9",3,SD05_SOD323,SOD-323F,https://www.mouser.it/ProductDetail/Littelfuse/SD05-01FTG?qs=KLh5H0KA3COy3%252Bmz8p7W%252Bg%3D%3D
+D4,1,SMAJ24A,SMA,https://www.mouser.it/ProductDetail/Vishay-Semiconductors/SMAJ24A?qs=N78E2i60HJ5M5XdBeXM0ag%3D%3D
+D7,1,1N4148,LL4148 MiniMELF,https://www.mouser.it/ProductDetail/Diotec-Semiconductor/LL4148?qs=OlC7AqGiEDlpsblNanpA%252Bg%3D%3D&mgh=1&vip=1&utm_id=20390293329&utm_source=google&utm_medium=cpc&utm_marketing_tactic=emeacorp&gad_source=1&gad_campaignid=20399867671&gclid=Cj0KCQjwzqXQBhD2ARIsAKrIeU-fST_CRks-ILfDr54sVDHo4DriQr4TUl0wYxnICYlcjig_NJ4uTYgaAhoiEALw_wcB
+F1,1,2A,1206_3216Metric,https://www.mouser.it/ProductDetail/Vishay-Sfernice/S2F120663V2A00TT?qs=4dK74SdgGtxaMukbYzVi2A%3D%3D
+J1,1,B2B-PH-SM4-TB,JST_B2B-PH-SM4-TB,https://www.mouser.it/ProductDetail/JST-Commercial/B2B-PH-SM4-TBLFSN?qs=QpmGXVUTftHN%252BmgxVRUmmA%3D%3D&utm_id=22222375893&utm_source=google&utm_medium=cpc&utm_marketing_tactic=emeacorp&gad_source=1&gad_campaignid=22222375893&gclid=Cj0KCQjwzqXQBhD2ARIsAKrIeU950_pT7hMDbCbPscfCDABmXoeoOI48EUzYvK2QU2Jz5vdnqWgN7k8aAo3-EALw_wcB
+J2,1,"MC_1,5_2-G-3.81","PhoenixContact_MC_1,5_2-G-3.81_1x02_P3.81mm_Horizontal",https://www.digikey.it/it/products/detail/molex/0395126002/2736022?gclsrc=aw.ds&gad_source=1&gad_campaignid=20983501416&gclid=Cj0KCQjwzqXQBhD2ARIsAKrIeU8ldG42tiwbP0crAn0HFg3lImwI1Ala-6uFSqDhQ8RO5HGrbKawof8aAlOjEALw_wcB
+J3,1,ICSP,PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical,
+J4,1,RC2014,PinHeader_2.54mm:PinHeader_1x40_P2.54mm_Vertical,
+J5,1,B4B-PH-SM4-TB,JST_B4B-PH-SM4-TB,https://www.digikey.it/it/products/detail/jst-sales-america-inc/B4B-PH-SM4-TB/926643?gclsrc=aw.ds&gad_source=1&gad_campaignid=20087055286&gclid=Cj0KCQjwzqXQBhD2ARIsAKrIeU9Wwednc9-tWVZsj8MrEXmUrrcslO0FLxI1Oqs9RTdvNSmFhbUAp8IaApJ_EALw_wcB
+J6,1,Micro_SD_Card_Det_Hirose_DM3D-SF,microSD_HC_Hirose_DM3D-SF,https://www.digikey.it/it/products/detail/hirose-electric-co-ltd/DM3D-SF/1786510?srsltid=AfmBOorqpWvi0mQ2h__XDOhYFMCw_KUuLcWAE111a715ij7xYCb_SZPN
+J7,1,BM04B-SRSS-TB_LF__SN_,JST_BM04B-SRSS-TB_LF__SN_,https://www.digikey.it/it/products/detail/jst-sales-america-inc/BM04B-SRSS-TB/926696?srsltid=AfmBOooR8Ed684AlNxAaFiF5a1R-c5kqzmUS2FA3YyMxkhJkJhk_7Rwi
+J8,1,GPIO,IDC-Header_2x10_P2.54mm_Vertical,
+"J9,J10,J12,J13,J14",5,Conn_01x02_Pin,PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical,
+J11,1,Conn_01x03_Pin,PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical,
+JP2,1,ICSP,TestPoint:TestPoint_2Pads_Pitch2.54mm_Drill0.8mm,
+L1,1,10uH LQS_8040,Inductor WE-LQS_8040,https://www.digikey.it/it/products/detail/w%C3%BCrth-elektronik/74404084100/4865710
+,,,,https://it.rs-online.com/web/p/induttori-smd/8164720P
+LD1,1,LED_B,LED_PLCC-2_3.4x3.0mm_KA,
+LD2,1,LED_G,LED_PLCC-2_3.4x3.0mm_KA,
+"LD3,LD4",2,LED_Y,LED_PLCC-2_3.4x3.0mm_KA,
+LD5,1,LED_R,LED_PLCC-2_3.4x3.0mm_KA,
+"LD6,LD8,LD13",3,LED G,LED_SMD:LED_0603_1608Metric,
+LD7,1,LED B,LED_SMD:LED_0603_1608Metric,
+"LD9,LD12",2,LED Y,LED_SMD:LED_0603_1608Metric,
+"LD10,LD11",2,LED R,LED_SMD:LED_0603_1608Metric,
+"LD14,LD15",2,LED W,LED_SMD:LED_0603_1608Metric,
+"Q1,Q2",2,BC807,SOT-23,
+"Q3,Q4,Q5,Q6,Q7",5,BSS138,SOT-23,
+Q8,1,FDN340P,SOT-23,https://www.mouser.it/ProductDetail/onsemi/FDN340P?qs=AMp2PTjoga9dhzFXRaqTZw%3D%3D&utm_id=22436684851&utm_source=google&utm_medium=cpc&utm_marketing_tactic=emeacorp&gad_source=1&gad_campaignid=22433177237&gclid=Cj0KCQiA9OnJBhD-ARIsAPV51xMmISE4G6wOhQhZE2ojnbiBIQnYNdBhsMfCxHmN-xhMigeABLkx_OUaAhoqEALw_wcB
+Q9,1,BC847,SOT-23,
+R1,1,100R,0805_2012Metric,
+"R2,R3,R6,R7,R8,R18,R19,R20,R21,R48,R54",11,1K,0603_1608Metric,
+R4,1,150K,0603_1608Metric,
+R5,1,27K,0603_1608Metric,
+R9,1,17K4,0603_1608Metric,
+"R10,R56,R59",3,100K,0603_1608Metric,
+"R11,R53",2,330R,0603_1608Metric,
+"R12,R26,R27,R30,R34,R39,R40,R41,R43,R49,R55,R58",12,10K,0603_1608Metric,
+"R13,R14",2,390R,0603_1608Metric,
+R15,1,39R,0603_1608Metric,
+"R16,R17,R25,R29,R31,R32,R36,R37,R44,R45,R46,R47,R50",13,4K7,0603_1608Metric,
+R22,1,15K,0603_1608Metric,
+"R23,R24",2,470R,0603_1608Metric,
+R28,1,100R,0603_1608Metric,
+"R33,R35,R38,R57,R60",5,2K2,0603_1608Metric,
+R42,1,3K6,0603_1608Metric,
+R51,1,47K,0603_1608Metric,
+R52,1,22K,0603_1608Metric,
+"RN1,RN2",2,10K,R_Array_SIP9,
+RN3,1,10K,R_Array_SIP5,
+"SW1,SW2,SW3",3,SW_Omron_B3FS,SW_SPST_Omron_B3FS-1010P,https://www.digikey.it/it/products/detail/omron-electronics-inc-emc-div/B3FS-1010/1811743
+U1,1,74HC02,DIP-14_W7.62mm,https://www.mouser.it/ProductDetail/Texas-Instruments/SN74HC02NE4?qs=mE33ZKBHyE6%252BoPtm0GsdUg%3D%3D
+U2,1,MAX693AESE,SOIC-16_3.9x9.9mm_P1.27mm,https://www.digikey.it/en/products/detail/analog-devices-inc-maxim-integrated/MAX693AESE/1512245
+U3,1,AP63201WU,TSOT-23-6,https://www.mouser.it/ProductDetail/Diodes-Incorporated/AP63201WU-7?qs=u16ybLDytRaVD%252BU3eG30NA%3D%3D&utm_id=22436684080&utm_source=google&utm_medium=cpc&utm_marketing_tactic=emeacorp&gad_source=1&gad_campaignid=22436714374&gclid=EAIaIQobChMI9deYv975kQMVX7ODBx2Soh6nEAAYASAAEgLs_vD_BwE
+U4,1,DS3231MZ,SOIC-8_3.9x4.9mm_P1.27mm,https://www.digikey.it/it/products/detail/analog-devices-inc-maxim-integrated/DS3231MZ-TRL/2754408?srsltid=AfmBOoriKmkaNSy4SQ8P7-zGNZCVNlXFVLOZPIQOZs-khwx2eqZxXfcq
+U5,1,ADP3338AKCZ-5,SOT-223,https://www.digikey.it/en/products/detail/analog-devices-inc/ADP3338AKCZ-5-REEL/994041
+U6,1,ATmega1284P-P,DIP-40_W15.24mm,https://www.digikey.it/it/products/detail/microchip-technology/ATMEGA1284P-PU/1914521?s=N4IgTCBcDaIIIBUC2BTA5gQwIxgBwBYAFAWkJAF0BfIA
+U7,1,74HC32,DIP-14_W7.62mm,https://www.mouser.it/ProductDetail/Texas-Instruments/SN74HC32NE4?qs=AgY10sKTvDKvoRvnDPHQkQ%3D%3D
+U8,1,74HC75,DIP-16_W7.62mm,https://www.mouser.it/ProductDetail/Texas-Instruments/CD74HC75E?qs=sGAEpiMZZMutXGli8Ay4kLxH4fh9btge9%2FneanMeAlU%3D
+U9,1,74HC08,DIP-14_W7.62mm,https://www.mouser.it/ProductDetail/Texas-Instruments/SN74HC08AN?qs=byeeYqUIh0O9MyGywGYg%252Bw%3D%3D
+U10,1,Z84C00xxP,DIP-40_W15.24mm,Ebay
+"U11,U16,U24",3,74LVC2G17DBV,SOT-23-6,https://www.mouser.it/ProductDetail/Texas-Instruments/SN74LVC2G17DBVR?qs=X1HXWTtiZ0RnstCufGEJxQ%3D%3D
+"U12,U22",2,74LV1T32GV,SOT-23-5,https://www.mouser.it/ProductDetail/Nexperia/74LV1T32GVH?qs=Cb2nCFKsA8qBSWWC7FqyYg%3D%3D
+U13,1,AS6C4008-55PCN,DIP-32_W15.24mm,https://www.mouser.it/ProductDetail/Alliance-Memory/AS6C4008-55PCN?qs=E5c5%252Bmu3i3%252BMOyro1Tlhzg%3D%3D&srsltid=AfmBOopkAVUzCKiddvrSY1_isNV1wfHD_qEl9pDQLDBg71kJUwcYTYvC
+U14,1,FT232_M,FT232_MODULE,Aliexpress
+U15,1,W5500-MINI,W5500-MINI,Aliexpress
+U17,1,74HCT2G17DBV,SOT-23-6,https://www.digikey.it/it/products/detail/nexperia-usa-inc/74HCT2G17GV-125/1300827?srsltid=AfmBOooJOAsQ0U8UqC_vBJfkqvoCq0DE093gDUWU8M_KRb2EjKSJ_0An
+U18,1,74AHCT2G125DP,TSSOP-8_3x3mm_P0.65mm,https://www.digikey.it/en/products/detail/nexperia-usa-inc/74AHCT2G125DP-125/1229696
+,,,,https://eu.mouser.com/ProductDetail/Nexperia/74AHCT2G125DP125?qs=P62ublwmbi%2FS7fXZumeLoQ%3D%3D&srsltid=AfmBOopdA_1nxEXo7vTxvlAvdnbwJ-ProUYswshpMLrA5LHPL_WXADmN
+U19,1,ADP3338AKCZ-3.3,SOT-223,https://www.digikey.it/it/products/detail/analog-devices-inc/ADP3338AKCZ-3-3RL7/820221?srsltid=AfmBOors2SpJVuqnxzzz1vlcc-yBJDhyMuXu-68nrlP7pNAXX7UtGVPi
+U20,1,MCP23017_SP,DIP-28_W7.62mm,https://www.digikey.it/en/products/detail/microchip-technology/MCP23017-E-SP/894272
+U21,1,24LC1025,SOIC-8_3.9x4.9mm_P1.27mm,
+U23,1,LM66100DCK,SOT-363_SC-70-6,https://www.mouser.it/ProductDetail/Texas-Instruments/LM66100DCKR?qs=sGAEpiMZZMv0DJfhVcWlK96a4SSnKIlfRRyZR5RNPQt%2F4%252BNfgeqScQ%3D%3D
+Y1,1,20MHz XTAL,HC49-SD,https://www.mouser.it/ProductDetail/ABRACON/ABLS-20000MHZ-B2-T?qs=zLkLEWnxMJwLHkuk3RUe5g%3D%3D&mgh=1&vip=1&utm_id=20395339358&utm_source=google&utm_medium=cpc&utm_marketing_tactic=emeacorp&gad_source=1&gad_campaignid=20399844385&gclid=Cj0KCQiAosrJBhD0ARIsAHebCNodwypMs49SEFr42jF-UjL5xlpJX77ptFT8wGRCOfKkEDGyxJVajuoaAkQsEALw_wcB
+,1,OLED Display,,https://www.amazon.it/dp/B0DFCKSWH9/ref=sspa_dk_detail_2?psc=1&pd_rd_i=B0DFCKSWH9&pd_rd_w=ce6ZD&content-id=amzn1.sym.27357f71-bd5d-4a5b-ba8c-4ad04b414c62&pf_rd_p=27357f71-bd5d-4a5b-ba8c-4ad04b414c62&pf_rd_r=JXKZNZHPCDS1BR5RDKJM&pd_rd_wg=esB7S&pd_rd_r=9b5ae363-7bb2-411d-9278-862ba7463e83&sp_csd=d2lkZ2V0TmFtZT1zcF9kZXRhaWw
+,3,14PIN_DIL_socket,DIP-14_W7.62mm_Socket,
+,1,16PIN_DIL_socket,DIP-16_W7.62mm_Socket,
+,1,28PIN_DIL_socket,DIP-28_W7.62mm_Socket,https://www.mouser.it/ProductDetail/Preci-dip/110-83-328-41-001101?qs=uQD7XCvsSCMckus%252ByY0uUg%3D%3D
+,2,40PIN_DIL_socket,DIP-40_W15.24mm_Socket,
