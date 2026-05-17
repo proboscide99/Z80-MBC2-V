@@ -267,7 +267,7 @@ S071225-R130526   If a client connects through a proxy and a PROXY Protocol V1 s
                    For this to work, the proxy's IP (LAN) should be configured as the "Trusted Proxy" in network configuration.
                   Random cleanup.
 
-S071225-R160526   Date / time of last Z80 watchdog reset is saved and displayed on OLED and console menu';
+S071225-R170526   Date / time of last Z80 watchdog reset is saved and displayed on OLED and console menu';
                   Console baud rate is also printed on OLED display, useful if you're unable to connect the serial port;
                   Fixed a bug that prevented AUTOEXEC from running if menu was bypassed;
                   Fixed a bug that prevented RTC from being read if menu was bypassed.
@@ -301,7 +301,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R160526"
+#define   IO_SUBS_END   "R170526"
 
 // ------------------------------------------------------------------------------
 //
@@ -573,7 +573,7 @@ const byte * const flahBootTable[1] PROGMEM = {boot_A_}; // Payload pointers tab
 
 struct RTC_St {
     byte  foundRTC;                       // Set to 1 if RTC is found, 0 otherwise
-    byte  OscStopFlag;                    // Set to 1 if oscillator stopped (unreliable time/date)
+    byte  OscStopFlag;                    // Set to > 0 if oscillator stopped (unreliable time/date)
     byte  seconds, minutes, hours;
     byte  day, month, year;
     byte tempC;                           // Temperature (Celsius) encoded in two’s complement integer format
@@ -822,7 +822,7 @@ void setup()
     sh1106_clear();
     sh1106_registerFont(&font6x8);
 
-    sprintf(dispP, "%s - %s", HW_REV, IO_SUBS_END);
+    sprintf(dispP, "%s   fw %s", HW_REV, IO_SUBS_END);
     sh1106_write_string(0, 0, dispP);
 
     sprintf(dispP, "Baudrate  %lu", baudrate);
@@ -3662,6 +3662,8 @@ void writeRTC(RTC_St *r)
   Wire.write(DS3231_STATRG);                      // Set the DS3231 Status Register
   Wire.write(0x08);                               // Reset the "Oscillator Stop Flag" (32KHz output left enabled)
   Wire.endTransmission();
+
+  r->OscStopFlag = 0;
 }
 
 // ------------------------------------------------------------------------------

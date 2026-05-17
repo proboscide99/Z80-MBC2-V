@@ -5,16 +5,6 @@
 
 #define   DEBUG             1                             // Debug: 0 = Off, 1 = Light, 2+ = Exhaustive
 
-//
-// Ottimizzazioni:
-// v Aggiungere << 3 nelle tre formule dei block select ed eliminare i corrispondenti shift nelle wizWrite, wizRead, wizBurstWrite
-// v scrivere una wizRead16 che legga un dato a 16 bit in una sola transazione SPI
-// v scrivere una wizWrite16 che scriva un dato a 16 bit in una sola transazione SPI
-// v Riattivare il setup dei registri RTR0 e RCR?
-// v Allargare i buffer del wix5500 per usare almeno 4KB (ancora compatibile con 4 socket) se non 8KB (ok con gli attuali due socket utilizzati)?
-//
-
-
 // ---------------------------------------------------------
 //  DEFINIZIONI HARDWARE
 // ---------------------------------------------------------
