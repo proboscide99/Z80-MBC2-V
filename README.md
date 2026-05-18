@@ -5,7 +5,7 @@
 The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by Just4Fun.
 
 ## Main Features
-- WizNet W5500 ethernet port with TELNET capability (remote terminal - CP/M 3.0 physical device - CBBS server)
+- WizNet W5500 ethernet port with TELNET capability (remote terminal - CP/M 3.0 physical device - CBBS)
 - 512KB Supercap-backed RAM (some of which can be used for a CP/M 3.0 RamDisk)
 - RC2014 bus for I/O and Memory expansion
 - Test points for internal signal testing
@@ -23,5 +23,4 @@ The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by
 [https://probosci.de/Z80mbc](https://probosci.de/Z80mbc)
 
 ---
-*Based on the original Z80-MBC2 project by Just4Fun*
 
