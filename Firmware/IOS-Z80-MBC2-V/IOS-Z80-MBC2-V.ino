@@ -1,16 +1,17 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R290823 - HW ref: A161125
+S220718-R170526 - HW ref: A060126
 
-IOS - I/O Subsystem for the  Z80-MBC2 (Multi Boot Computer - Z80 128kB RAM @ 4/8Mhz @ Fosc = 16MHz)
+Based on original Z80-MBC2 project version S220718-R290823 IOS
 
+IOS - I/O Subsystem for the  Z80-MBC2-V (Multi Boot Computer - Z80 512kB RAM @ 5/10Mhz @ Fosc = 20MHz)
 
 Notes:
 
-1:  This SW is ONLY for the Atmega32A used as EEPROM and I/O subsystem (16MHz external oscillator) for 
+1:  This SW is ONLY for the Atmega1284P used as EEPROM and I/O subsystem (20MHz external oscillator) for 
     the Z80 CPU.
     
-2:  Tested on Atmega32A/Atmega1284P @ Arduino IDE 1.8.19 and MightyCore v.2.2.2
+2:  Tested on Atmega1284P @ Arduino IDE 1.8.19 and MightyCore v.2.2.2
 
 3:  Embedded FW: S200718 iLoad (Intel-Hex loader)
 
@@ -55,52 +56,6 @@ on Fuzix IRQ handling.
 
 CHANGELOG:
 
-
-S220718           First revision.
-S220718-R010918   Added "Disk Set" feature to manage multiple OS on SD (multi-booting).
-                  Added support for QP/M 2.71 (with file names timestamping).
-                  Added support for Atmega32A @ 20MHz (overclocked) to show the Z80 clock speed 
-                   accordingly (Note that 20MHz is out of Atmega32A specifications!).
-S220718-R190918   Added support for CP/M 3.
-                  Fixed a bug in the manual RTC setting.
-S220718-R260119   Changed the default serial speed to 115200 bps.
-                  Added support for xmodem protocol (extended serial Rx buffer check and  
-                   two new flags into the SYSFLAG Opcode for full 8 bit serial I/O control.
-                  Added support for uTerm (A071218-R250119 and following revisions unless stated otherwise) 
-                   reset at boot time.
-S220718-R280819   Added a new Disk Set for the UCSD Pascal implementation (porting by Michel Bernard).
-S220718-R240620   Added support for Collapse OS (https://collapseos.org/).
-S220718-R290823   Added Fuzix OS support (www.fuzix.org):
-                   changed Serial Rx interrupt generation;
-                   added Systick interrupt.
-                   added SETIRQ Opcode to enable/disable IRQ generation (see important notes inside the comments);
-                   added ATXBUFF Opcode to check the available space of serial Tx buffer;
-                   added SYSIRQ Opcode to check the triggered IRQ;
-                   added SETTICK Opcode to set/change the Systick time;
-                  Changed the behavior of the selection 3 of the boot menu and others minor changes.
-                  Added support for the SPP Adapter (A240721-R270921 and following revisions unless stated 
-                   otherwise) for parallel printers with 3 new Opcodes (SETSPP, WRSPP and GETSPP);
-                   please note that now when the GPIO is set to operate as an SPP port all 
-                   the GPIO write Opcodes (GPIOA Write, GPIOB Write, IODIRA Write, IODIRB Write, 
-                   GPPUA Write, GPPUB Write) are ignored/disabled.
-                  Added serial port speed selection inside the boot menu.
-                  Added serial port Baud Recovery procedure. It can be triggered only if the serial port was
-                   set at a speed not equal then the default (115200), pressing the RESET + USER keys and 
-                   releasing the RESET key while holding down the USER key for about 4s until both USER and 
-                   IOS leds blink quickly. At the next reboot the serial speed will be set at the default 
-                   value (115200).
-                  Added support to run on an Atmega1284/Atmega1284P MCU (leaving more space for customiztions).
-                  Added SETOPT Opcode to enable/disable the message "CP/M WARM BOOT" (if CP/M CBIOS support 
-                   this switch).
-                  Now if the GPE expansion is found GPA0 and GPA2 are set with pullup enabled. This way if
-                   the SPP adapter is used and a printer is connected, selected online and powered on before 
-                   the Z80-MBC2, possible "strange" printer behaviors are avoided. This makes the STROBE and 
-                   INIT lines of the parallel port not active after a power on/reset.
-
-*** Changes for Z80_MBC2-V ***
-*
-* Original project's name: 'S220718-R290823_IOS-Z80-MBC2'
-*
 S071225-R071225   MCU_RTS_  renamed to SEL_WDOG ('SELECT' button input / hardware watchdog control)
                   MCU_CTS_  renamed to BUSACK (connected to processor's BUSACK signal)
                   BANK1     renamed to ETH_CS (ethernet SPI chip select)
@@ -311,8 +266,8 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   DEBUG                   1                 // Debug off = 0, light = 1, on = 2, on with interrupt trace and opcodes trace = 3, on with SEL_WDOG as trigger = 4
 
-#define   MAX_RAM_BANK            14                // 512KB (14 does not allow selecting the fixed bank, which is #15)
-#define   DEFAULT_RAM_BANK        3                 // Bank selected if eeprom blank. This is a free bank (not used by CP/M nor RAMDISK)
+#define   MAX_RAM_BANK            14                // 512KB (14 does not allow selecting the fixed bank, which is #15 and is mapped on upper half address space)
+#define   DEFAULT_RAM_BANK        3                 // Bank selected if eeprom is blank. This is a free bank (not used by CP/M nor RAMDISK)
 
 #define   Z80_MIN_CLOCK           1000000UL         // Minimum Z80 clock frequency (Hz)
 
@@ -1450,7 +1405,7 @@ void sysMenu(uint8_t bootm)
 
 
 // ----------------------------------------
-// FLUSH SERIAL /TELNET BUFFERS
+// FLUSH SERIAL / TELNET BUFFERS
 // ----------------------------------------
 void FlushSerials(void)
 {
@@ -1556,9 +1511,9 @@ void loop()
       // Opcode 0x10  SETOPT          1
       // Opcode 0x11  SETSPP          1
       // Opcode 0x12  WRSPP           1
-      // Opcode 0xFF  No operation    1
       //
-      // Opcodes for MBC2-V
+      // Opcodes for MBC2-V - 0x40 offset
+      //
       // Opcode 0x40  SETIRQBANK      1           // set the INT-safe ram bank, 0xFF = all
       // Opcode 0x41  WRDISPCTRL      n           // set display control data (coordinates, etc)
       // Opcode 0x42  WRDISPDATA      n           // write display data (text)
@@ -1568,9 +1523,9 @@ void loop()
       // Opcode 0x46  TELNET TX S1    1           // sends a byte over telnet socket 1
       // Opcode 0x47  TELNET TX S2    1           // RESERVED for socket 2
       // Opcode 0x48  TELNET TX S3    1           // RESERVED for socket 3
-      // Opcode 0x49  GPIOASETRESET   2
-      // Opcode 0x4A  GPIOBSETRESET   2
-      // Opcode 0x4B  SETWATCHDOG     1
+      // Opcode 0x49  GPIOASETRESET   2           // Writes to GPIO port A expander with OR / AND masks
+      // Opcode 0x4A  GPIOBSETRESET   2           // Writes to GPIO port B expander with OR / AND masks
+      // Opcode 0x4B  SETWATCHDOG     1           // Set Z80 watchdog timeout and reset type
       //
       //
       //
@@ -1590,7 +1545,8 @@ void loop()
       // Opcode 0x89  SYSIRQ          1
       // Opcode 0x8A  GETSPP          1
       //
-      // Opcodes for MBC2-V
+      // Opcodes for MBC2-V - 0xC0 offset
+      //
       // Opcode 0xC0  GETTELNETFLAGS  1           // get telnet flags for currently selected socket
       // Opcode 0xC1  GETBANK         1           // get the active bank number
       // Opcode 0xC2  GETTELNETSTAT03 1           // get telnet read only status bits for sockets 0...3
