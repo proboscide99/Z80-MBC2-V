@@ -5,15 +5,18 @@
 The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by Just4Fun.
 
 ## Main Features
+- WizNet W5500 ethernet port with TELNET capability (remote terminal - CP/M 3.0 physical device - CBBS server)
+- 512KB Supercap-backed RAM (some of which can be used for a CP/M 3.0 RamDisk)
+- RC2014 bus for I/O and Memory expansion
+- Test points for internal signal testing
+- Optional 8-24V power supply
+- USB-C port for power and serial communication
+- TTL serial I/O (as an alternative to USB)
+- 3,3V I2C interface for a small (128x64) auxiliary onboard OLED display
 - Z80 CMOS running up to 10MHz
 - ATMega1284P for I/O
-- Ethernet (WizNet W5500) for remote (telnet) access and/or running CBBS software
-- Supercap-backed 512KB RAM (some of which used for a CP/M 3.0 RamDisk)
-- Hardware watchdog
-- 3,3V I2C interface for a small (128x64) auxiliary OLED display
-- 8-24V power supply (as an alternative to USB power)
-- TTL serial I/O (as an alternative to USB data)
-- RC2014 expansion bus
+- RTC
+- Hardware watchdog for ATmega and IOS-based software watchdog for Z80
 - Fully software compatible with original project
 
 ## 🌐 Project Page
