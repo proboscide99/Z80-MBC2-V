@@ -77,6 +77,7 @@ typedef struct {
     uint8_t   telnet_cmd_state;
     uint8_t   telnet_flags;
     uint8_t   iac_state;
+    uint8_t   last_iac_cmd;
     uint8_t   is_telnet;
     uint8_t   send_banner;
     uint8_t   send_iac;

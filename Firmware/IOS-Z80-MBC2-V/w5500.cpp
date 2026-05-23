@@ -253,6 +253,7 @@ static void telnet_struct_init(void)
     s->telnet_cmd_state = 0;
     s->telnet_flags     = 0;
     s->iac_state        = 0;
+    s->last_iac_cmd     = 0;
     s->is_telnet        = false;
     s->send_banner      = true;
     s->send_iac         = false;                                                // don't send IAC by default
@@ -398,6 +399,7 @@ void telnet_handler(void)
       s->last_rx_time = millis();
       s->send_banner = true;                                                      // banner will be sent
       s->iac_state = 0;
+      s->last_iac_cmd = 0;
       s->is_telnet = false;                                                       // by default, not a telnet client (raw client)
       s->telnet_flags &= ~TFLAG_DISCONNECT;                                       // clears any stale DISCONNECT REQUEST flag
 
@@ -542,10 +544,11 @@ void telnet_handler(void)
     {
       static const char banner_top[] = "\r\n"
         "*****************************************\r\n"
-        "*         Welcome to Z80_MBC2-V         *\r\n";
+        "*         Welcome to Z80_MBC2-V         *\r\n"
+        "*     https://www.probosci.de/Z80mbc    *\r\n"
+        "*                                       *\r\n";
 
       static const char banner_running[] =
-        "*                                       *\r\n"
         "*  If you get no prompt, the processor  *\r\n"
         "* might not be listening on this socket *\r\n";
 
@@ -760,11 +763,14 @@ void telnet_handler(void)
       //  IAC PARSER (cooked mode only, RAW mode disabled)
       // ---------------------------------------------------------
       bool consume_only = false;
+      
       switch (s->iac_state)
       {
         case 0:
-          if (b == 0xFF) {                                                    // if client sends 0xFF while RAW mode is disabled, it is a telnet client
+          if (b == 0xFF)                                                      // if client sends 0xFF while RAW mode is disabled, it is a telnet client
+          {
             s->iac_state = 1;
+            s->last_iac_cmd = 0;
 
             if (!s->is_telnet)                                                // once,
             {
@@ -782,7 +788,10 @@ void telnet_handler(void)
         case 1:
           if (b == 0xFA) s->iac_state = 2;
           else if (b == 0xF0) s->iac_state = 0;
-          else s->iac_state = 3;
+          else {
+            s->last_iac_cmd = b;                                              // stores the command (if 'DO', b will be 0xFD)
+            s->iac_state = 3;
+          }
           consume_only = true;
         break;
 
@@ -792,6 +801,15 @@ void telnet_handler(void)
         break;
 
         case 3:
+          if (s->last_iac_cmd == 0xFD && b == 0x01)                           // if previous command was 'DO' (0xFD) and the option is 'ECHO' (0x01),
+          {                                                                   // reply "server do echo" (IAC WILL ECHO)
+            telnet_write_char(s, 0xFF);                                       // IAC
+            telnet_write_char(s, 0xFB);                                       // WILL
+            telnet_write_char(s, 0x01);                                       // ECHO
+#if DEBUG > 0
+            Serial.println(F("[TELNET] Replied 'IAC WILL ECHO' to 'IAC DO ECHO' request\r\n"));
+#endif
+          }
           s->iac_state = 0;
           consume_only = true;
         break;

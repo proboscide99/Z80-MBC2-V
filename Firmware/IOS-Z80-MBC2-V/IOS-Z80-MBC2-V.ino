@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R170526 - HW ref: A060126
+S220718-R230526 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -227,6 +227,7 @@ S071225-R170526   Date / time of last Z80 watchdog reset is saved and displayed 
                   Fixed a bug that prevented AUTOEXEC from running if menu was bypassed;
                   Fixed a bug that prevented RTC from being read if menu was bypassed.
 
+S071225-R230526   Added reply 'IAC WILL ECHO' to 'IAC DO ECHO' requests to solve twice-echoed characters on some client, despite the initial IAC negotiation
 
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
@@ -256,7 +257,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R170526"
+#define   IO_SUBS_END   "R230526"
 
 // ------------------------------------------------------------------------------
 //
