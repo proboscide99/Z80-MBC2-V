@@ -4153,15 +4153,15 @@ void DrawNetworkTable(uint8_t cursor, NetConfig *net)
 {
   char buf[32];
 
-  consolePrint("\033[2J\033[H+--------------------------------------------------+\r\n");
-  consolePrint("|              NETWORK CONFIGURATION               |\r\n");
-  consolePrint("+----------------------+---------------------------+\r\n");
+  consolePrint("\033[2J\033[H+-----------------------------------------------+\r\n");
+  consolePrint("|             NETWORK CONFIGURATION             |\r\n");
+  consolePrint("+----------------------+------------------------+\r\n");
 
   for(uint8_t n = 0; n < NETWORKMENU_ROWS; ++n)
     RedrawRow(n, 0, net);
 
-  consolePrint("\r\n+-----------------------------------------------------------------------------+\r\n");
-  consolePrint("↑↓ sel.field/change   ←→ sel.byte   ENTER edit/confirm   S save   ESC disc.\r\n");
+  consolePrint("\r\n+-----------------------------------------------+\r\n");
+  consolePrint("↑↓       select row / modify selected field\r\n←→       select field\r\nENTER    begin/end editing row\r\nS        save all\r\nESC      discard all\r\n");
 }
 
 // ------------------------------------------------------------------------------

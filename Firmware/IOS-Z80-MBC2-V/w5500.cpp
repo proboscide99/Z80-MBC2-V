@@ -424,7 +424,7 @@ void telnet_handler(void)
     if (st != SOCK_ESTABLISHED && s->last_state == SOCK_ESTABLISHED)
     {
 #if DEBUG > 0
-      Serial.print(F("[TELNET] Disconnected on socket "));
+      Serial.print(F("[TELNET] Disconnected socket "));
       Serial.println(s->sn);
 #endif
 
@@ -544,11 +544,10 @@ void telnet_handler(void)
     {
       static const char banner_top[] = "\r\n"
         "*****************************************\r\n"
-        "*         Welcome to Z80_MBC2-V         *\r\n"
-        "*     https://www.probosci.de/Z80mbc    *\r\n"
-        "*                                       *\r\n";
+        "*         Welcome to Z80_MBC2-V         *\r\n";
 
       static const char banner_running[] =
+        "*                                       *\r\n"
         "*  If you get no prompt, the processor  *\r\n"
         "* might not be listening on this socket *\r\n";
 
@@ -556,6 +555,8 @@ void telnet_handler(void)
         "*             Z80 is Halted             *\r\n";
 
       static const char banner_bottom[] =
+        "*                                       *\r\n"
+        "*    https://www.probosci.de/Z80mbc     *\r\n"
         "*****************************************\r\n\r\n";
 
 #if DEBUG > 0
