@@ -1520,13 +1520,13 @@ void loop()
       // Opcode 0x42  WRDISPDATA      n           // write display data (text)
       // Opcode 0x43  SELTELNETSOCKET 1           // set the current telnet socket (session) number
       // Opcode 0x44  SETTELNETFLAGS  2           // set telnet flags byte (SET MASK, RESET MASK) for currently selected socket
-      // Opcode 0x45  TELNET TX S0    1           // sends a byte over telnet socket 0
-      // Opcode 0x46  TELNET TX S1    1           // sends a byte over telnet socket 1
+      // Opcode 0x45  TELNET TX S0    1           // send a byte over telnet socket 0
+      // Opcode 0x46  TELNET TX S1    1           // send a byte over telnet socket 1
       // Opcode 0x47  TELNET TX S2    1           // RESERVED for socket 2
       // Opcode 0x48  TELNET TX S3    1           // RESERVED for socket 3
-      // Opcode 0x49  GPIOASETRESET   2           // Writes to GPIO port A expander with OR / AND masks
-      // Opcode 0x4A  GPIOBSETRESET   2           // Writes to GPIO port B expander with OR / AND masks
-      // Opcode 0x4B  SETWATCHDOG     1           // Set Z80 watchdog timeout and reset type
+      // Opcode 0x49  GPIOASETRESET   2           // Write to GPIO port A expander with OR / AND masks
+      // Opcode 0x4A  GPIOBSETRESET   2           // Write to GPIO port B expander with OR / AND masks
+      // Opcode 0x4B  SETWATCHDOG     2           // Set Z80 watchdog timeout and reset type (TRUE / INVERTED value)
       //
       //
       //
