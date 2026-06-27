@@ -113,5 +113,6 @@ void w5500_init(void);
 void telnet_handler(void);
 void telnet_tx_push(uint8_t, uint8_t);
 bool telnetClientConnected(uint8_t);
+void systemResetSafe(void);
 
 #endif

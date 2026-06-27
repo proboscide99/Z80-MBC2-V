@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R230526 - HW ref: A060126
+S220718-R280626 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -229,6 +229,8 @@ S071225-R170526   Date / time of last Z80 watchdog reset is saved and displayed 
 
 S071225-R230526   Added reply 'IAC WILL ECHO' to 'IAC DO ECHO' requests to solve twice-echoed characters on some client, despite the initial IAC negotiation
 
+S071225-R280626   Added a "floppy icon" symbol to the 6x8 font; The menu-level reset now performs a full ATmega reset.
+
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -257,7 +259,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R230526"
+#define   IO_SUBS_END   "R280626"
 
 // ------------------------------------------------------------------------------
 //
@@ -3267,7 +3269,8 @@ void loop()
                 EEPROM.put(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
 
                 if (Z80WatchDOG_time & 0x80)                      // if D7 of watchdog setting is SET,
-                  sysMenu(0);                                     // restarts the menu
+//                  sysMenu(0);                                     // restarts the menu
+                  systemResetSafe();                              // performs a full reset
                 else
                   Z80_async_reset();                              // otherwise, Z80 reset
 

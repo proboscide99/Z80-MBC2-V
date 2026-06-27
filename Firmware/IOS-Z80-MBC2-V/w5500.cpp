@@ -147,7 +147,6 @@ static void telnet_write_char(TelnetSession *, uint8_t);
 static void telnet_tx_pop(TelnetSession *);
 static void telnet_write_block(TelnetSession *, const uint8_t *, uint16_t);
 static void w5500_disconnect(TelnetSession *);
-static void systemResetSafe(void);
 static void telnet_debug_regs(TelnetSession *);
 static void telnet_struct_init(void);
 static bool parse_ip_string(char*, uint8_t*);
@@ -1368,7 +1367,7 @@ static uint8_t spiTransfer(uint8_t data)
   return SPDR;
 }
 
-static void systemResetSafe(void)
+void systemResetSafe(void)
 {
     cli();  // disabilita tutti gli interrupt
 
