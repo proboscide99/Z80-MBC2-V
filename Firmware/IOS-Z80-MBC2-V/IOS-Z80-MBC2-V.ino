@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R280626 - HW ref: A060126
+S220718-R050726 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -229,7 +229,9 @@ S071225-R170526   Date / time of last Z80 watchdog reset is saved and displayed 
 
 S071225-R230526   Added reply 'IAC WILL ECHO' to 'IAC DO ECHO' requests to solve twice-echoed characters on some client, despite the initial IAC negotiation
 
-S071225-R280626   Added a "floppy icon" symbol to the 6x8 font; The menu-level reset now performs a full ATmega reset.
+S071225-R280626   Added a "floppy icon" symbol to the 6x8 font.
+
+S071225-R050726   Bugfix: now the ram bank override for O.S. loading is properly performed ALSO for unattended start ('remember last selection' option).
 
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
@@ -259,7 +261,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R280626"
+#define   IO_SUBS_END   "R050726"
 
 // ------------------------------------------------------------------------------
 //
@@ -1072,13 +1074,6 @@ void sysMenu(uint8_t bootm)
           {
              diskSet = iCount;
              EEPROM.update(EE_DISKSET_ADDR, iCount);
-
-            if (currentBank != 0)
-            {
-              consolePrint("Overriding selected bank (%u) to 0\r\n\r\n", currentBank);
-              currentBank = 0;
-              SetRAMBank(0);
-            }
           }
           else                                                                // if ESC was pressed,
             inChar = 13;                                                      // stay in the menu
@@ -1150,9 +1145,16 @@ void sysMenu(uint8_t bootm)
     }
   }
 
-  // Print current Disk Set and OS name (if OS boot is enabled)
+  // For bootMode 2 (O.S. load) forces bank 0 and prints current Disk Set and OS name
   if (bootMode == 2)
   {
+    if (currentBank != 0)
+    {
+      consolePrint("\r\nOverriding selected bank (%u) to 0\r\n\r\n", currentBank);
+      currentBank = 0;
+      SetRAMBank(0);
+    }
+
     consolePrint("IOS: Current ");
     printOsName(diskSet);
     consolePrint("\r\n");
@@ -3269,8 +3271,8 @@ void loop()
                 EEPROM.put(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
 
                 if (Z80WatchDOG_time & 0x80)                      // if D7 of watchdog setting is SET,
-//                  sysMenu(0);                                     // restarts the menu
-                  systemResetSafe();                              // performs a full reset
+                  sysMenu(0);                                     // restarts the menu
+//                  systemResetSafe();                              // performs a full reset
                 else
                   Z80_async_reset();                              // otherwise, Z80 reset
 
