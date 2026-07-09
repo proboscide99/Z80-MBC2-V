@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R050726 - HW ref: A060126
+S220718-R090726 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -233,6 +233,8 @@ S071225-R280626   Added a "floppy icon" symbol to the 6x8 font.
 
 S071225-R050726   Bugfix: now the ram bank override for O.S. loading is properly performed ALSO for unattended start ('remember last selection' option).
 
+S071225-R090726   Added F-RAM support
+
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -261,7 +263,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R050726"
+#define   IO_SUBS_END   "R090726"
 
 // ------------------------------------------------------------------------------
 //
@@ -373,6 +375,15 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 // ------------------------------------------------------------------------------
 //
+// Hardware definitions for external F-Ram (i.e. CY15E064J / FM24C64B)
+//
+// ------------------------------------------------------------------------------
+
+#define   F_RAM_ADDR              0x54              // A2 = 1, A1 = 0, A0 = 0
+#define   F_RAM_BUFSIZE           128
+
+// ------------------------------------------------------------------------------
+//
 // File names and starting addresses
 //
 // ------------------------------------------------------------------------------
@@ -415,6 +426,14 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 #define   EE_SERBAUD_ADDR         104               // Internal EEPROM address for the current serial speed index
 #define   EE_DEFBANK_ADDR         105               // Internal EEPROM address for default ram bank at power-on
 #define   EE_REMEMBERLASTSEL_ADDR 106               // Internal EEPROM address for last menu selection flag
+
+// ------------------------------------------------------------------------------
+//
+// F-Ram addresses
+//
+// ------------------------------------------------------------------------------
+
+#define   FRAM_Z80WATCHDOG_ADDR   0                 // F-ram address for Z80 watchdog counter's structure
 
 // ------------------------------------------------------------------------------
 //
@@ -539,7 +558,7 @@ struct RTC_St {
     byte tempC;                           // Temperature (Celsius) encoded in two’s complement integer format
 };
 
-struct Z80_WDOG_St {                      // max size = 10 bytes (see 'EE_Z80WATCHDOG_ADDR')
+struct Z80_WDOG_St {                      // check available size (EE_Z80WATCHDOG_ADDR / FRAM_Z80WATCHDOG_ADDR)
     uint32_t count;                       // wdog event occurrences
     byte  seconds, minutes, hours;        // time of last occurrence
     byte  day, month, year;
@@ -599,6 +618,14 @@ Z80_WDOG_St   Z80wdog_counters;
 
 // DS3231 RTC variables
 RTC_St        rtcData;
+
+// External F-Ram variables
+uint8_t       fRam_ok         = 0;        // Set to 1 if f-ram is found, 0 otherwise
+uint16_t      fRam_addr;
+uint8_t       fRam_datalen;
+uint8_t       fRam_transferred;
+uint8_t       fRam_buf[F_RAM_BUFSIZE];
+
 
 // SD disk and CP/M support variables
 FATFS         filesysSD;                  // Filesystem object (PetitFS library)
@@ -695,6 +722,8 @@ void waitKey(void);
 void printOsName(byte);
 void FlushSerials(void);
 void Z80_async_reset(void);
+uint8_t Read_FRAM(uint16_t, uint8_t *, uint8_t);
+uint8_t Write_FRAM(uint16_t, uint8_t *, uint8_t);
 
 // ------------------------------------------------------------------------------
 
@@ -760,11 +789,6 @@ void setup()
     diskSet = 0;
   }
 
-  // Read the Z80 watchdog-reset counter and date/time
-  EEPROM.get(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
-  if (Z80wdog_counters.count == 0xFFFFFFFF)
-    Z80wdog_counters.count = 0;
-
   uint32_t baudrate = baudIndex[EEPROM.read(EE_SERBAUD_ADDR)];
   Serial.begin(baudrate);
   delay(500);
@@ -813,10 +837,34 @@ void setup()
     //  this just in case the SPP adapter is used and a printer is connected and powered on before the Z80-MBC2,
     //  to avoid a possible "strange" behavior of the printer (GPA0 = STROBE_, GPA2 = INIT_. See SPP Adapter schematic)
     Wire.beginTransmission(GPIOEXP_ADDR);
-    Wire.write(GPPUA_REG);                        // Select GPPUA
-    Wire.write(0b00000101);                       // Write value (1 = pullup enabled, 0 = pullup disabled)
+    Wire.write(GPPUA_REG);                                                    // Select GPPUA
+    Wire.write(0b00000101);                                                   // Write value (1 = pullup enabled, 0 = pullup disabled)
     Wire.endTransmission();
   }
+
+  // Initialize the external F-Ram
+  Wire.beginTransmission(F_RAM_ADDR);
+  if (Wire.endTransmission() == 0) 
+  {
+    fRam_ok = 1;                                                              // Set to 1 if chip is found
+/*
+    uint8_t b[16];                                                            // debug dump of first 16 bytes
+    Read_FRAM(0, b, 16);
+    Serial.print("F_RAM: 0000");
+    for (byte i = 0; i < 16; ++i)
+      Serial.printf(" %02X", b[i]);
+    Serial.println("");
+*/
+  }
+
+  // Read the Z80 watchdog-reset counter and date/time
+  // If FRam not available, reads from internal eeprom
+  if (fRam_ok)
+    Read_FRAM(FRAM_Z80WATCHDOG_ADDR, (uint8_t*)&Z80wdog_counters, sizeof(Z80wdog_counters));
+  else
+    EEPROM.get(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
+  if (Z80wdog_counters.count == 0xFFFFFFFF)
+    Z80wdog_counters.count = 0;
 
   // Check the serial speed index and set it to the default if needed
   if (EEPROM.read(EE_SERBAUD_ADDR) >= maxBaudIndex)
@@ -966,6 +1014,8 @@ void sysMenu(uint8_t bootm)
       
       if (moduleGPIO) consolePrint("IOS: Found GPE Option\r\n");
 
+      if (fRam_ok) consolePrint("IOS: Found F-Ram Option (CY15E064J / FM24C64B)\r\n");
+
       // Print ethernet info if found
       if (eth_ok)
       {
@@ -984,7 +1034,10 @@ void sysMenu(uint8_t bootm)
       if (rememberLastSel) consolePrint("ON");
       else consolePrint("OFF");
 
-      consolePrint("\r\nIOS: Z80 watchdog reset counter: %lu", Z80wdog_counters.count);
+      consolePrint("\r\nIOS: Z80 watchdog reset counter");
+      if (fRam_ok)
+        consolePrint(" (F-RAM)");
+      consolePrint(": %lu", Z80wdog_counters.count);
       if (Z80wdog_counters.count == 0)
         consolePrint("\r\n");
       else
@@ -1461,6 +1514,57 @@ void consolePrint(const char *fmt, ...)
 }
 
 
+// ------------------------------------------------------------------
+// Reads 'len' bytes from F-Ram address 'fAddress' into buffer 'buf'
+// ------------------------------------------------------------------
+uint8_t Read_FRAM(uint16_t fAddress, uint8_t *buf, uint8_t len)
+{
+  uint8_t i;
+
+  if (!fRam_ok)
+    return(0);
+
+  Wire.beginTransmission(F_RAM_ADDR);
+  Wire.write(fAddress >> 8);
+  Wire.write(fAddress & 0xFF);
+  Wire.endTransmission(false);
+
+  Wire.requestFrom((uint8_t)F_RAM_ADDR, len);
+  for (i = 0; Wire.available() && i < len; ++i)
+    *buf++ = Wire.read();
+
+#if DEBUG > 0
+  Serial.printf("[FRAM] Read %u bytes @ %04X\n\r", i, fAddress);
+#endif
+
+  return(i);
+}
+
+
+// -----------------------------------------------------------------
+// Writes 'len' bytes from buffer 'buf' to F-Ram address 'fAddress'
+// -----------------------------------------------------------------
+uint8_t Write_FRAM(uint16_t fAddress, uint8_t *buf, uint8_t len)
+{
+  if (!fRam_ok)
+    return(0);
+
+  uint8_t i;
+  Wire.beginTransmission(F_RAM_ADDR);
+  Wire.write(fAddress >> 8);
+  Wire.write(fAddress & 0xFF);
+
+  i = Wire.write(buf, len);
+  Wire.endTransmission(true);
+
+#if DEBUG > 0
+  Serial.printf("[FRAM] Written %u bytes @ %04X\n\r", i, fAddress);
+#endif
+
+  return(i);
+}
+
+
 // ------------------------------------------------------------------------------
 
 void loop() 
@@ -1531,6 +1635,8 @@ void loop()
       // Opcode 0x49  GPIOASETRESET   2           // Write to GPIO port A expander with OR / AND masks
       // Opcode 0x4A  GPIOBSETRESET   2           // Write to GPIO port B expander with OR / AND masks
       // Opcode 0x4B  SETWATCHDOG     2           // Set Z80 watchdog timeout and reset type (TRUE / INVERTED value)
+      // Opcode 0x4C  SETFRAMPARAMS   3           // Set F-RAM address (16 bit) and datalen (8 bit) for next rd/wr operation
+      // Opcode 0x4D  FRAMWRITE       n           // F-RAM data write
       //
       //
       //
@@ -1560,6 +1666,8 @@ void loop()
       // Opcode 0xC5  TELNET RX S2    1           // RESERVED for socket 2
       // Opcode 0xC6  TELNET RX S3    1           // RESERVED for socket 3
       // Opcode 0xC7  ETH REMOTE IP   5           // get the IP address and proxy state of the device connected to the selected socket (see SELTELNETSOCKET)
+      // Opcode 0xC8  FRAMGETPARAMS   1           // get F-RAM transferred bytes
+      // Opcode 0xC9  FRAMREAD        n           // F-RAM data read
       //
       // Opcode 0xFF  No operation    1
       //
@@ -2505,6 +2613,53 @@ void loop()
             }
           break;
 
+          case 0x4C:
+            // SETFRAMPARAMS - sets 'fRam_addr' and 'fRam_datalen'
+            //
+            //                I/O DATA:    D7 D6 D5 D4 D3 D2 D1 D0
+            //                            ---------------------------------------------------------
+            //                              X  X  X  X  X  X  X  X    Address low byte
+            //                              X  X  X  X  X  X  X  X    Address high byte
+            //                              X  X  X  X  X  X  X  X    Datalen
+            if (!ioByteCnt)
+            {
+              fRam_addr = ioData;                                       // first byte is LSB address
+            }
+            else if (ioByteCnt == 1)
+            {
+              fRam_addr |= ((word)ioData << 8);                         // second byte is MSB address
+            }
+            else
+            {
+              fRam_datalen = ioData;                                    // third byte is datalen
+
+              if (fRam_datalen > F_RAM_BUFSIZE)
+                fRam_datalen = F_RAM_BUFSIZE;
+
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
+            }
+            ++ioByteCnt;
+          break;
+
+          case 0x4D:
+            // FRAMWRITE
+            //                I/O DATA:    D7 D6 D5 D4 D3 D2 D1 D0
+            //                            ---------------------------------------------------------
+            //                              X  X  X  X  X  X  X  X    'fRam_datalen' data bytes
+            //
+            if (ioByteCnt < F_RAM_BUFSIZE)
+              fRam_buf[ioByteCnt] = ioData;
+
+            ++ioByteCnt;
+
+            if (ioByteCnt == fRam_datalen)
+            {
+              fRam_transferred = Write_FRAM(fRam_addr, fRam_buf, fRam_datalen);
+              fRam_addr += fRam_transferred;                            // address auto increment
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
+            }
+          break;
+
           default:
 //#if DEBUG > 0
             consolePrint("\r\n[PROTO] WR DATA (OUT0), 0x%02X with invalid opcode 0x%02X\r\n", ioData, ioOpcode);
@@ -2515,7 +2670,8 @@ void loop()
         }
         if ((ioOpcode != 0x0A) && (ioOpcode != 0x0C) &&
             (ioOpcode != 0x41) && (ioOpcode != 0x42) && (ioOpcode != 0x44) &&
-            (ioOpcode != 0x49) && (ioOpcode != 0x4A) && (ioOpcode != 0x4B))
+            (ioOpcode != 0x49) && (ioOpcode != 0x4A) && (ioOpcode != 0x4B) &&
+            (ioOpcode != 0x4C) && (ioOpcode != 0x4D))
           ioOpcode = 0xFF;                                              // All done for the single byte Opcodes. 
                                                                         //  Set ioOpcode = "No operation"
       }
@@ -2638,7 +2794,7 @@ void loop()
               Wire.endTransmission();
               // Read GPIOA
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.requestFrom(GPIOEXP_ADDR, 1);
+              Wire.requestFrom((uint8_t)GPIOEXP_ADDR, (uint8_t)1);
               ioData = Wire.read();
             }
           break;
@@ -2660,7 +2816,7 @@ void loop()
               Wire.endTransmission();
               // Read GPIOB
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.requestFrom(GPIOEXP_ADDR, 1);
+              Wire.requestFrom((uint8_t)GPIOEXP_ADDR, (uint8_t)1);
               ioData = Wire.read();
             }
           break;
@@ -2953,7 +3109,7 @@ void loop()
 
               // Read GPIOA (SPP Status Lines)
               Wire.beginTransmission(GPIOEXP_ADDR);
-              Wire.requestFrom(GPIOEXP_ADDR, 1);
+              Wire.requestFrom((uint8_t)GPIOEXP_ADDR, (uint8_t)1);
               ioData = Wire.read();
               ioData = (ioData & 0b11111000) | 0b00000001;      // Set D0 = 1, D1 = D2 = 0
             }
@@ -3074,6 +3230,38 @@ void loop()
             ioByteCnt++;                                        // Increment the counter of the exchanged data bytes
           break;
 
+          case  0xC8:
+            // FRAMGETPARAMS - reads the number of transferred bytes
+            //
+              ioData = fRam_transferred;
+          break;
+
+          case 0xC9:
+            // FRAMREAD - Reads 'fRam_datalen' data bytes from F-RAM (see SETFRAMPARAMS)
+            //
+            //                I/O DATA:    D7 D6 D5 D4 D3 D2 D1 D0
+            //                            ---------------------------------------------------------
+            //                              X  X  X  X  X  X  X  X    'fRam_datalen' data bytes
+            //
+            if (ioByteCnt == 0)
+            {
+              if (fRam_datalen > F_RAM_BUFSIZE)
+                fRam_datalen = F_RAM_BUFSIZE;
+
+              fRam_transferred = Read_FRAM(fRam_addr, fRam_buf, fRam_datalen);
+            }
+               
+            if (ioByteCnt < F_RAM_BUFSIZE)
+              ioData = fRam_buf[ioByteCnt];
+
+            ++ioByteCnt;
+
+            if (ioByteCnt == fRam_datalen)
+            {
+              fRam_addr += fRam_transferred;                            // address auto increment
+              ioOpcode = 0xFF;                                          // All done. Set ioOpcode = "No operation"
+            }
+          break;
 
           default:
 //#if DEBUG > 0
@@ -3082,8 +3270,8 @@ void loop()
             ioOpcode = 0xFF;
           break;
         }
-        if ((ioOpcode != 0x84) && (ioOpcode != 0x86) && (ioOpcode != 0xC7)) ioOpcode = 0xFF;  // All done for the single byte Opcodes. 
-                                                                                              //  Set ioOpcode = "No operation"
+        if ((ioOpcode != 0x84) && (ioOpcode != 0x86) && (ioOpcode != 0xC7) && (ioOpcode != 0xC9)) ioOpcode = 0xFF;  // All done for the single byte Opcodes. 
+                                                                                                                    //  Set ioOpcode = "No operation"
       }
       DDRA = 0xFF;                                // Configure Z80 data bus D0-D7 (PA0-PA7) as output
       PORTA = ioData;                             // Current output on data bus
@@ -3268,7 +3456,10 @@ void loop()
                 Z80wdog_counters.month = rtcData.month;
                 Z80wdog_counters.year = rtcData.year;
 
-                EEPROM.put(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
+                if (fRam_ok)
+                  Write_FRAM(FRAM_Z80WATCHDOG_ADDR, (uint8_t*)&Z80wdog_counters, sizeof(Z80wdog_counters));
+                else
+                  EEPROM.put(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
 
                 if (Z80WatchDOG_time & 0x80)                      // if D7 of watchdog setting is SET,
                   sysMenu(0);                                     // restarts the menu
@@ -3591,7 +3782,7 @@ void readRTC(RTC_St *r)
   Wire.write(DS3231_SECRG);                       // Set the DS3231 Seconds Register
   Wire.endTransmission();
   // Read from RTC and convert to binary
-  Wire.requestFrom(DS3231_RTC, 18);
+  Wire.requestFrom((uint8_t)DS3231_RTC, (uint8_t)18);
   r->seconds = bcdToDec(Wire.read() & 0x7f);
   r->minutes = bcdToDec(Wire.read());
   r->hours = bcdToDec(Wire.read() & 0x3f);
@@ -3647,7 +3838,7 @@ void RTCCheck(RTC_St *r)
   Wire.beginTransmission(DS3231_RTC);
   Wire.write(DS3231_STATRG);                      // Set the DS3231 Status Register
   Wire.endTransmission();
-  Wire.requestFrom(DS3231_RTC, 1);
+  Wire.requestFrom((uint8_t)DS3231_RTC, (uint8_t)1);
   r->OscStopFlag = Wire.read() & 0x80;            // Read the "Oscillator Stop Flag"
 
   // Enable 1Hz output on INT_/SQW
