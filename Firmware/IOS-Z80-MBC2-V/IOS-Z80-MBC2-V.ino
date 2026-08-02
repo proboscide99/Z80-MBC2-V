@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R090726 - HW ref: A060126
+S220718-R020826 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -235,6 +235,8 @@ S071225-R050726   Bugfix: now the ram bank override for O.S. loading is properly
 
 S071225-R090726   Added F-RAM support
 
+S071225-R020826   Bugfix: F-RAM initialized before OLED (to properly display the Z80-watchdog counter)
+
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -263,7 +265,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R090726"
+#define   IO_SUBS_END   "R020826"
 
 // ------------------------------------------------------------------------------
 //
@@ -797,6 +799,37 @@ void setup()
   Wire.begin();
   Wire.setClock(400000);
 
+  // Initialize the external F-Ram
+  Wire.beginTransmission(F_RAM_ADDR);
+  if (Wire.endTransmission() == 0) 
+  {
+    fRam_ok = 1;                                                              // Set to 1 if chip is found
+/*
+    uint8_t b[16];                                                            // debug dump of first 16 bytes
+    Read_FRAM(0, b, 16);
+    Serial.print("F_RAM: 0000");
+    for (byte i = 0; i < 16; ++i)
+      Serial.printf(" %02X", b[i]);
+    Serial.println("");
+*/
+  }
+
+  // Read the Z80 watchdog-reset counter and date/time
+  // If FRam not available, reads from internal eeprom
+  if (fRam_ok)
+    Read_FRAM(FRAM_Z80WATCHDOG_ADDR, (uint8_t*)&Z80wdog_counters, sizeof(Z80wdog_counters));
+  else
+    EEPROM.get(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
+  if (Z80wdog_counters.count == 0xFFFFFFFF)
+    Z80wdog_counters.count = 0;
+
+  // Check the serial speed index and set it to the default if needed
+  if (EEPROM.read(EE_SERBAUD_ADDR) >= maxBaudIndex)
+  // Invalid value. Set it to the default index
+  {
+    EEPROM.update(EE_SERBAUD_ADDR, maxBaudIndex-1);
+  }
+
   // Initialize the I2C display and print board info
   disp_ok = sh1106_init();
   if (disp_ok)
@@ -842,36 +875,6 @@ void setup()
     Wire.endTransmission();
   }
 
-  // Initialize the external F-Ram
-  Wire.beginTransmission(F_RAM_ADDR);
-  if (Wire.endTransmission() == 0) 
-  {
-    fRam_ok = 1;                                                              // Set to 1 if chip is found
-/*
-    uint8_t b[16];                                                            // debug dump of first 16 bytes
-    Read_FRAM(0, b, 16);
-    Serial.print("F_RAM: 0000");
-    for (byte i = 0; i < 16; ++i)
-      Serial.printf(" %02X", b[i]);
-    Serial.println("");
-*/
-  }
-
-  // Read the Z80 watchdog-reset counter and date/time
-  // If FRam not available, reads from internal eeprom
-  if (fRam_ok)
-    Read_FRAM(FRAM_Z80WATCHDOG_ADDR, (uint8_t*)&Z80wdog_counters, sizeof(Z80wdog_counters));
-  else
-    EEPROM.get(EE_Z80WATCHDOG_ADDR, Z80wdog_counters);
-  if (Z80wdog_counters.count == 0xFFFFFFFF)
-    Z80wdog_counters.count = 0;
-
-  // Check the serial speed index and set it to the default if needed
-  if (EEPROM.read(EE_SERBAUD_ADDR) >= maxBaudIndex)
-  // Invalid value. Set it to the default index
-  {
-    EEPROM.update(EE_SERBAUD_ADDR, maxBaudIndex-1);
-  }
 
   // Try to muont the SD volume
   mountSD(&filesysSD); mountSD(&filesysSD);
