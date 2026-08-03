@@ -8,7 +8,7 @@ If you use a different tool version, please leave a message so the instructions 
 If your device is blank, you first need to program it using an external hardware programmer.
 You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
 
-The repository provides both source code and pre-compiled `.hex` files (with and without a bootloader).
+The repository provides both source code and pre-compiled .hex files (with and without a bootloader).
 The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
 
 ---
@@ -17,7 +17,7 @@ The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** 
 
 * Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
 * Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
-* Urboot requires AVRDUDE 7.x or higher to handle serial uploads, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
+* Urboot requires AVRDUDE 7.x or higher, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
 
 > [!NOTE]
 > MightyCore v2.2.2 can be easily found online. A copy of the archive is also included in this repository.
@@ -87,11 +87,11 @@ You will need the programmer every time you upgrade the IOS firmware
 
 ### Option B: Programming from Command-Line
 
-These examples show how to flash the pre-compiled `.hex` files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x.
+These examples show how to flash the pre-compiled .hex files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x.
 Modify the options to suit your specific hardware setup.
 
 First, open a command-line console and navigate to the directory above your Arduino installation.
-Copy the target `.hex` file into this working folder to avoid typing long paths.
+Copy the target .hex file into this working folder to avoid typing long paths.
 
 #### Command for version WITHOUT the bootloader:
 ```sh
