@@ -6,7 +6,7 @@ You can, of course, compile it from source and program it into the MCU using Ard
 If you use a different tool version, please leave a message so the instructions for that specific setup can be added.
 
 If your device is blank, you first need to program it using an external hardware programmer.
-You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
+ You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
 
 The repository provides both source code and pre-compiled .hex files (with and without a bootloader).
 The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
