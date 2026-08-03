@@ -2,21 +2,21 @@
 
 This project has been tested using **Arduino IDE 1.8.19** with **MightyCore v2.2.2**, so the verified instructions provided below are related to this environment.
 
-You can, of course, compile it from source and program it into the MCU using Arduino IDE 2.x and a more recent version of MightyCore.
+You can, of course, compile it from source and program it into the MCU using Arduino IDE 2.x and a more recent version of MightyCore.  
 If you use a different tool version, please leave a message so the instructions for that specific setup can be added.
 
-If your device is blank, you first need to program it using an external hardware programmer.
- You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
+If your device is blank, you first need to program it using an external hardware programmer.  
+You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
 
-The repository provides both source code and pre-compiled .hex files (with and without a bootloader).
+The repository provides both source code and pre-compiled .hex files (with and without a bootloader).  
 The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
 
 ---
 
 ## Why MightyCore 2.2.2?
 
-* Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
-* Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
+* Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).  
+* Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.  
 * Urboot requires AVRDUDE 7.x or higher, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
 
 > [!NOTE]
@@ -25,7 +25,8 @@ The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** 
 Two files from the original 2.2.2 MightyCore need to be modified: `avrdude.conf` (mandatory) and `boards.txt` (recommended).
 
 ### 1. avrdude.conf
-Even though MightyCore 2.2.2 is the correct core to use for IDE 1.8.19, its bundled `avrdude.conf` file was already prepared for the transition to AVRDUDE 7.x. It contains directives—such as `default_spi = "";`—that the AVRDUDE 6.3 interpreter cannot understand.
+Even though MightyCore 2.2.2 is the correct core to use for IDE 1.8.19, its bundled `avrdude.conf` file was already prepared for the transition to AVRDUDE 7.x.  
+It contains directives—such as `default_spi = "";`—that the AVRDUDE 6.3 interpreter cannot understand.
 
 Replace this file with the native one from your Arduino IDE installation:
 * **Source File**: `arduino-1.8.19/hardware/tools/avr/etc/avrdude.conf`
@@ -57,12 +58,12 @@ IOS will recognize this flag and display the buffer size in the boot menu.
 
 ## Programming the MCU
 
-For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).
+For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).  
 If the board is fully populated, there is no need to unplug any component prior to programming the MCU.
 
-Connect your programmer to the 6-pin **J3** connector located on the right of the USB module, above the **Reset** button.
-This is the standard SPI programming connector found on almost any Arduino board.
-A small circle indicates the position of **Pin 1**, which is in the lower-left corner.
+Connect your programmer to the 6-pin **J3** connector located on the right of the USB module, above the **Reset** button.  
+This is the standard SPI programming connector found on almost any Arduino board.  
+A small circle indicates the position of **Pin 1**, which is in the lower-left corner.  
 
 > [!TIP]
 > You probably won't need to apply power to the board, as many hardware programmers supply 5V directly to the target MCU.
@@ -87,10 +88,10 @@ You will need the programmer every time you upgrade the IOS firmware
 
 ### Option B: Programming from Command-Line
 
-These examples show how to flash the pre-compiled .hex files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x.
+These examples show how to flash the pre-compiled .hex files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x.  
 Modify the options to suit your specific hardware setup.
 
-First, open a command-line console and navigate to the directory above your Arduino installation.
+First, open a command-line console and navigate to the directory above your Arduino installation.  
 Copy the target .hex file into this working folder to avoid typing long paths.
 
 #### Command for version WITHOUT the bootloader:
