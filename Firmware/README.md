@@ -73,17 +73,23 @@ The only library required to compile and program this project is MightyCore (v2.
 
 1. Start the IDE and open the `IOS-MBC2V` project
 2. Set the IDE according to the picture below (this screenshot shows the MightyCore v2.2.2 settings)
-3. **If you want to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu. After this step, the external programmer is no longer needed. When a bootloader is flashed, the **IOS** LED blinks to signal readiness for serial firmware upload. Connect a USB-C cable to the serial adapter on the board, select the proper port in the IDE, and click **Upload**
-4. **If you want to flash directly via hardware programmer**: On IDE 1.8.19, hold the `SHIFT` key down while clicking the **Upload** icon. You will need the programmer every time you upgrade the IOS firmware
+3. **If you want to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu.
+After this step, the external programmer is no longer needed.
+When a bootloader is flashed, the **IOS** LED blinks to signal readiness for serial firmware upload.
+Connect a USB-C cable to the serial adapter on the board, select the proper port in the IDE, and click **Upload**
+4. **If you want to flash directly via hardware programmer**: On IDE 1.8.19, hold the `SHIFT` key down while clicking the **Upload** icon.
+You will need the programmer every time you upgrade the IOS firmware
 
 ![IDE Settings for MightyCore v2.2.2](images/ide-settings-222.png)
 
 
 ### Option B: Programming from Command-Line
 
-These examples show how to flash the pre-compiled `.hex` files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x. Modify the options to suit your specific hardware setup.
+These examples show how to flash the pre-compiled `.hex` files using an `stk500v1` programmer on port `/dev/ttyACM0` at `115200` baud under Linux with AVRDUDE 6.x.
+Modify the options to suit your specific hardware setup.
 
-First, open a command-line console and navigate to the directory above your Arduino installation. Copy the target `.hex` file into this working folder to avoid typing long paths.
+First, open a command-line console and navigate to the directory above your Arduino installation.
+Copy the target `.hex` file into this working folder to avoid typing long paths.
 
 #### Command for version WITHOUT the bootloader:
 ```sh
