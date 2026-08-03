@@ -1,20 +1,23 @@
-# AVR 1284P MCU Programming
+## AVR 1284P MCU Programming
 
 This project has been tested using **Arduino IDE 1.8.19** with **MightyCore v2.2.2**, so the verified instructions provided below are related to this environment.
 
-You can, of course, compile it from source and program it into the MCU using Arduino IDE 2.x and a more recent version of MightyCore. If you use a different tool version, please leave a message so the instructions for that specific setup can be added.
+You can, of course, compile it from source and program it into the MCU using Arduino IDE 2.x and a more recent version of MightyCore.
+If you use a different tool version, please leave a message so the instructions for that specific setup can be added.
 
-If your device is blank, you first need to program it using an external hardware programmer. You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
+If your device is blank, you first need to program it using an external hardware programmer.
+You cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
 
-The repository provides both source code and pre-compiled `.hex` files (with and without a bootloader). The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
+The repository provides both source code and pre-compiled `.hex` files (with and without a bootloader).
+The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
 
 ---
 
 ## Why MightyCore 2.2.2?
 
-* **Legacy Compatibility**: Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
-* **Bootloader Changes**: Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
-* **AVRDUDE Constraints**: Urboot requires AVRDUDE 7.x or higher to handle serial uploads, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
+* Legacy Compatibility: Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
+* Bootloader Changes: Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
+* AVRDUDE Constraints: Urboot requires AVRDUDE 7.x or higher to handle serial uploads, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
 
 > [!NOTE]
 > MightyCore v2.2.2 can be easily found online. A copy of the archive is also included in this repository.

@@ -1,7 +1,5 @@
 # Z80-MBC2-V
 
-**UNDER CONSTRUCTION**
-
 The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by Just4Fun.
 
 ## Main Features
