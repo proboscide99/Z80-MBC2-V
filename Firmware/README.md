@@ -15,9 +15,9 @@ The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** 
 
 ## Why MightyCore 2.2.2?
 
-* Legacy Compatibility: Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
-* Bootloader Changes: Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
-* AVRDUDE Constraints: Urboot requires AVRDUDE 7.x or higher to handle serial uploads, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
+* Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).
+* Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.
+* Urboot requires AVRDUDE 7.x or higher to handle serial uploads, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
 
 > [!NOTE]
 > MightyCore v2.2.2 can be easily found online. A copy of the archive is also included in this repository.
@@ -27,14 +27,15 @@ Two files from the original 2.2.2 MightyCore need to be modified: `avrdude.conf`
 ### 1. avrdude.conf
 Even though MightyCore 2.2.2 is the correct core to use for IDE 1.8.19, its bundled `avrdude.conf` file was already prepared for the transition to AVRDUDE 7.x. It contains directives—such as `default_spi = "";`—that the AVRDUDE 6.3 interpreter cannot understand.
 
-**The Fix:** Replace this file with the native one from your Arduino IDE installation:
+Replace this file with the native one from your Arduino IDE installation:
 * **Source File**: `arduino-1.8.19/hardware/tools/avr/etc/avrdude.conf`
 * **Destination Path**: `hardware/MightyCore/avr/avrdude.conf`
 
 After this change, MightyCore 2.2.2 will work flawlessly with Arduino v1.8.19.
 
 ### 2. boards.txt
-A modified `boards.txt` file is included in this repository with two simple, minor changes in the `1284/P` section. If you have already customized your `boards.txt` file, do not replace it; just modify these two lines instead:
+A modified `boards.txt` file is included in this repository with two simple, minor changes in the `1284/P` section.
+If you have already customized your `boards.txt` file, do not replace it; just modify these two lines instead:
 
 In the `1284/P` section:
 
@@ -49,13 +50,15 @@ In the `1284/P` section:
   1284.menu.LTO.Os.compiler.cpp.extra_flags=-DSERIAL_RX_BUFFER_SIZE=1024
   ```
 
-This configures a larger (1KB) serial buffer size, allowing the Z80-MBC2 IOS firmware to better handle data transfers over the serial port. IOS will recognize this flag and display the buffer size in the boot menu.
+This configures a larger (1KB) serial buffer size, allowing the Z80-MBC2 IOS firmware to better handle data transfers over the serial port.
+IOS will recognize this flag and display the buffer size in the boot menu.
 
 ---
 
 ## Programming the MCU
 
-For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed). If the board is fully populated, there is no need to unplug any component prior to programming the MCU.
+For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).
+If the board is fully populated, there is no need to unplug any component prior to programming the MCU.
 
 Connect your programmer to the 6-pin **J3** connector located on the right of the USB module, above the **Reset** button.
 This is the standard SPI programming connector found on almost any Arduino board.
