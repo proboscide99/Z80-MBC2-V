@@ -80,7 +80,9 @@ Connect a USB-C cable to the serial adapter on the board, select the proper port
 4. **If you want to flash directly via hardware programmer**: On IDE 1.8.19, hold the `SHIFT` key down while clicking the **Upload** icon.
 You will need the programmer every time you upgrade the IOS firmware
 
+
 ![IDE Settings for MightyCore v2.2.2](images/ide-settings-222.png)
+
 
 
 ### Option B: Programming from Command-Line
