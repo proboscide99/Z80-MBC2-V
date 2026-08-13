@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R020826 - HW ref: A060126
+S220718-R130826 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -235,7 +235,9 @@ S071225-R050726   Bugfix: now the ram bank override for O.S. loading is properly
 
 S071225-R090726   Added F-RAM support
 
-S071225-R020826   Bugfix: F-RAM initialized before OLED (to properly display the Z80-watchdog counter)
+S071225-R020826   Bugfix: F-RAM now initialized before OLED (to properly display the Z80-watchdog counter)
+
+S071225-R130826   Minor changes to the Network Configuration menu'
 
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
@@ -265,7 +267,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R020826"
+#define   IO_SUBS_END   "R130826"
 
 // ------------------------------------------------------------------------------
 //
@@ -4154,19 +4156,23 @@ bool ChangeNetworkConfig(void)
       // ESC = esci senza salvare
       EEPROM.get(EEPROM_NETCFG_ADDR, netcfg);                                 // ricarica configurazione originale
       DrawNetworkTable(cursor, &netcfg);                                      // ridisegna tutto
-      consolePrint("\r\n\r\n\r\nIOS: Changes discarded.\r\n");
+      consolePrint("\x1B[22;1HIOS: Changes discarded.\r\n");
+      delay(1000);
       return(false);                                                          // esci dall’editor
     }
     if (k == KEY_SAVE)
     {
       // S (uppercase) = save and exit
-      consolePrint("\x1B[15;1HIOS: Type 'yes' to confirm         \r\n");
+      consolePrint("\x1B[22;1HIOS: Type 'yes' to confirm         \r\n");
       uint8_t keySeq = 0;
       do
       {
         char k2 = WaitAndBlink(BLK);
         if ((keySeq == 0 && k2 == 'y') || (keySeq == 1 && k2 == 'e') || (keySeq == 2 && k2 == 's'))
+        {
           ++keySeq;
+          consolePrint("%c", k2);
+        }
         else
           keySeq = 0xFF;
       }while(keySeq < 3);
@@ -4175,12 +4181,12 @@ bool ChangeNetworkConfig(void)
       {
         netcfg.magic = NETCFG_MAGIC;
         EEPROM.put(EEPROM_NETCFG_ADDR, netcfg);
-        consolePrint("\x1B[15;1HIOS: Network configuration updated. Restarting interface...\r\n");
+        consolePrint("\x1B[24;1HIOS: Network configuration updated. Restarting interface...\r\n");
         return(true);
       }
       else
       {
-        consolePrint("\x1B[15;1HIOS: Network configuration skipped.\r\n");
+        consolePrint("\x1B[22;1HIOS: Network configuration skipped, try again.\r\n   \033[%u;1H", 4 + cursor);
       }
     }
     else if (k == KEY_ENTER)
@@ -4234,7 +4240,7 @@ bool ChangeNetworkConfig(void)
         break;
       }
 
-      // dopo qualsiasi edit: ridisegna la riga e rimetti il cursore a colonna 1
+      // after any edit, redraw the line and move the cursor to first column
       RedrawRow(cursor, cursor, &netcfg);
       consolePrint("\033[%u;1H", 4 + cursor);
     }
@@ -4360,7 +4366,7 @@ void DrawNetworkTable(uint8_t cursor, NetConfig *net)
     RedrawRow(n, 0, net);
 
   consolePrint("\r\n+-----------------------------------------------+\r\n");
-  consolePrint("↑↓       select row / modify selected field\r\n←→       select field\r\nENTER    begin/end editing row\r\nS        save all\r\nESC      discard all\r\n");
+  consolePrint("↑↓       select row / modify selected field\r\n←→       select field\r\nENTER    begin/end editing row\r\nS        save all\r\nESC      discard all\r\n\033[%u;1H", 4 + cursor);
 }
 
 // ------------------------------------------------------------------------------
