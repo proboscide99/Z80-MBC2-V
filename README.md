@@ -17,7 +17,7 @@ The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by
 - Fully software compatible with original project
 
 ## 🌐 Project Page
-[https://probosci.de/Z80mbc](https://probosci.de/Z80mbc)
+[https://probosci.de/Z80mbc](https://www.probosci.de/Z80mbc)
 
 ---
 
