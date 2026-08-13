@@ -57,14 +57,16 @@ IOS will recognize this flag and display the buffer size in the boot menu.
 
 ## Programming the MCU
 
-For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).  
+For testing purposes, you may do this with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).  
+
 If the board is fully populated, there is no need to unplug any component prior to programming the MCU.
 
 In this example, an home-made `stk500v1` programmer has been used (see the picture below).
 
 Connect your programmer to the 6-pin **J3** connector located on the right of the USB module, above the **Reset** button.  
 This is the standard SPI programming connector found on almost any Arduino board.  
-A small circle indicates the position of **Pin 1**, which is in the lower-left corner.  
+
+A small circle indicates the position of **Pin 1**, which is in the lower-left corner (brown wire in the picture).  
 
 You probably won't need to apply power to the board, as many hardware programmers supply 5V directly to the target MCU.  
 
