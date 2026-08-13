@@ -16,7 +16,7 @@ The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** 
 ## Why MightyCore 2.2.2?
 
 * Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size)  
-* Newer versions (starting from v3.x) replaced the Optiboot bootloader with Urboot, which is not compatible with Arduino IDE 1.8.19  
+* Newer versions (starting from v3.x) replaced the Optiboot bootloader with Urboot, which is not compatible with IDE 1.8.19  
 
 > [!NOTE]
 > MightyCore v2.2.2 can be easily found online. A copy of the archive is also included in this repository.
@@ -76,11 +76,13 @@ You probably won't need to apply power to the board, as many hardware programmer
 The only library required to compile and program this project is MightyCore (v2.2.2 for legacy Arduino 1.8.19 IDE).
 
 1. Start the IDE and open the `IOS-MBC2V` project
-2. Set the IDE according to the picture below (this screenshot shows the MightyCore v2.2.2 settings)
+2. Set the IDE according to the picture below (this screenshot shows the MightyCore v2.2.2 settings)  
+
 3. **If you want to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu.
 After this step, the external programmer is no longer needed.
 When a bootloader is flashed, the **IOS** LED blinks to signal readiness for serial firmware upload.
-Connect a USB-C cable to the serial adapter on the board, select the proper port in the IDE, and click **Upload**
+Connect a USB-C cable to the serial adapter on the board, select the proper port in the IDE, and click **Upload**  
+
 4. **If you want to flash directly via hardware programmer**: On IDE 1.8.19, hold the `SHIFT` key down while clicking the **Upload** icon.
 You will need the programmer every time you upgrade the IOS firmware
 
