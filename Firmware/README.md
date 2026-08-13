@@ -88,7 +88,6 @@ The only library required to compile and program this project is MightyCore (v2.
   <img src="images/ide-settings-222.png" alt="IDE 1.8.19 Settings for MightyCore v2.2.2"><br>
   <em>IDE 1.8.19 Settings for MightyCore v2.2.2</em>
 </p>
-<br>
 
 3. **If you want to be (later) able to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu.  
 After this step, the external programmer is no longer needed.  
