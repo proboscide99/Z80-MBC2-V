@@ -85,8 +85,8 @@ The only library required to compile and program this project is MightyCore (v2.
 
 
 
-3. **If you want to be (later) able to upload via USB-C serial port**:  
-Select **Burn Bootloader** from the *Tools* menu. After this step, the external programmer is no longer needed.  
+3. **If you want to be (later) able to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu.  
+After this step, the external programmer is no longer needed.  
 When a bootloader is flashed, the **IOS** LED blinks to signal readiness for serial firmware upload.  
 Connect a USB-C cable to the serial adapter on the board, select the proper port in the IDE, and click **Upload**  
 
