@@ -3,10 +3,10 @@
 This project has been tested using **Arduino IDE 1.8.19** with **MightyCore v2.2.2**, so the verified instructions provided below are related to this environment.
 
 You can, of course, compile it from source and program it into the MCU using Arduino IDE 2.x and a more recent version of MightyCore.  
+
 If you use a different tool version, please leave a message so the instructions for that specific setup can be added.
 
-If your device is blank, you first need to program it using an external hardware programmer:  
-you cannot upload the sketch directly via the serial port, as this requires a bootloader to be present in the MCU.
+If your device is blank, you first need to program it using an external hardware programmer (you cannot upload the sketch directly via the serial port).
 
 The repository provides both source code and pre-compiled .hex files (with and without a bootloader).  
 The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** crystal.
@@ -15,9 +15,8 @@ The bootloader embedded in the file is **Optiboot**, configured for a **20MHz** 
 
 ## Why MightyCore 2.2.2?
 
-* Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size).  
-* Newer versions (starting from v3.x) replaced the classic Optiboot bootloader with a new one called Urboot.  
-* Urboot requires AVRDUDE 7.x or higher, whereas Arduino IDE 1.8.19 uses AVRDUDE 6.3, making them incompatible.
+* Older versions lack functionalities required for this project (such as the ability to configure the serial buffer size)  
+* Newer versions (starting from v3.x) replaced the Optiboot bootloader with Urboot, which is not compatible with Arduino IDE 1.8.19  
 
 > [!NOTE]
 > MightyCore v2.2.2 can be easily found online. A copy of the archive is also included in this repository.
@@ -61,12 +60,16 @@ IOS will recognize this flag and display the buffer size in the boot menu.
 For testing purposes, you may do this even with a minimal hardware configuration (i.e., without the Z80, RAM, SD-CARD, Ethernet, and surrounding logic installed).  
 If the board is fully populated, there is no need to unplug any component prior to programming the MCU.
 
+In this example, an home-made `stk500v1` programmer has been used (see the picture below).
+
 Connect your programmer to the 6-pin **J3** connector located on the right of the USB module, above the **Reset** button.  
 This is the standard SPI programming connector found on almost any Arduino board.  
 A small circle indicates the position of **Pin 1**, which is in the lower-left corner.  
 
-> [!TIP]
-> You probably won't need to apply power to the board, as many hardware programmers supply 5V directly to the target MCU.
+You probably won't need to apply power to the board, as many hardware programmers supply 5V directly to the target MCU.  
+
+![Connecting an stk500v1 programmer](images/stk500v1.png)
+
 
 ### Option A: Programming using the Arduino IDE
 
