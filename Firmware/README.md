@@ -75,6 +75,7 @@ You probably won't need to apply power to the board, as many hardware programmer
   <img src="images/stk500v1.jpg" alt="Connecting an stk500v1 programmer"><br>
   <em>Connecting an stk500v1 programmer</em>
 </p>
+<br>
 
 ### Option A: Programming using the Arduino IDE
 
@@ -88,6 +89,7 @@ The only library required to compile and program this project is MightyCore (v2.
   <img src="images/ide-settings-222.png" alt="IDE 1.8.19 Settings for MightyCore v2.2.2"><br>
   <em>IDE 1.8.19 Settings for MightyCore v2.2.2</em>
 </p>
+<br>
 
 3. **If you want to be (later) able to upload via USB-C serial port**: Select **Burn Bootloader** from the *Tools* menu.  
 After this step, the external programmer is no longer needed.  
