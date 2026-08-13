@@ -4,9 +4,8 @@ The **Z80-MBC2-V** is a variant of the popular Z80-MBC2 (Multi Boot Computer) by
 
 ## Main Features
 - WizNet W5500 ethernet port with TELNET capability (remote terminal - CP/M 3.0 physical device - CBBS)
-- 512KB Supercap-backed RAM (some of which can be used for a CP/M 3.0 RamDisk)
-- RC2014 bus for I/O and Memory expansion
-- Test points for internal signal testing
+- 512KB Supercap-backed RAM (some of which can be (has been) used for a CP/M 3.0 352KB RamDisk)
+- RC2014 bus and Test points for I/O expansion / logic analysis
 - Optional 8-24V power supply
 - USB-C port for power and serial communication
 - TTL serial I/O (as an alternative to USB)
