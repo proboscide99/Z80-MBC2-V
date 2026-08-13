@@ -81,7 +81,10 @@ The only library required to compile and program this project is MightyCore (v2.
 2. Set the IDE according to the picture below (this screenshot shows the MightyCore v2.2.2 settings)  
 
 
-![IDE Settings for MightyCore v2.2.2](images/ide-settings-222.png)
+<p align="center">
+  <img src="images/ide-settings-222.png" alt="IDE 1.8.19 Settings for MightyCore v2.2.2"><br>
+  <em>IDE Settings for MightyCore v2.2.2</em>
+</p>
 
 
 
