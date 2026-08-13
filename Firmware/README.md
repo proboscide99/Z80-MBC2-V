@@ -68,7 +68,7 @@ A small circle indicates the position of **Pin 1**, which is in the lower-left c
 
 You probably won't need to apply power to the board, as many hardware programmers supply 5V directly to the target MCU.  
 
-![Connecting an stk500v1 programmer](images/stk500v1.png)
+![Connecting an stk500v1 programmer](images/stk500v1.jpg)
 
 
 ### Option A: Programming using the Arduino IDE
