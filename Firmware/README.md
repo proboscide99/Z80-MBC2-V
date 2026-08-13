@@ -75,7 +75,6 @@ You probably won't need to apply power to the board, as many hardware programmer
   <img src="images/stk500v1.jpg" alt="Connecting an stk500v1 programmer"><br>
   <em>Connecting an stk500v1 programmer</em>
 </p>
-<br>
 
 ### Option A: Programming using the Arduino IDE
 
