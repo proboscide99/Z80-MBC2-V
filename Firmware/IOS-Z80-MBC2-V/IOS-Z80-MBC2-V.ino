@@ -4163,7 +4163,7 @@ bool ChangeNetworkConfig(void)
     if (k == KEY_SAVE)
     {
       // S (uppercase) = save and exit
-      consolePrint("\x1B[22;1HIOS: Type 'yes' to confirm         \r\n");
+      consolePrint("\x1B[%u;1HIOS: Type 'yes' to confirm         \r\n", NETWORKMENU_ROWS+12);
       uint8_t keySeq = 0;
       do
       {
@@ -4181,12 +4181,12 @@ bool ChangeNetworkConfig(void)
       {
         netcfg.magic = NETCFG_MAGIC;
         EEPROM.put(EEPROM_NETCFG_ADDR, netcfg);
-        consolePrint("\x1B[24;1HIOS: Network configuration updated. Restarting interface...\r\n");
+        consolePrint("\x1B[%u;1HIOS: Network configuration updated. Restarting interface...\r\n", NETWORKMENU_ROWS+14);
         return(true);
       }
       else
       {
-        consolePrint("\x1B[22;1HIOS: Network configuration skipped, try again.\r\n   \033[%u;1H", 4 + cursor);
+        consolePrint("\x1B[%u;1HIOS: Network configuration skipped, try again.\r\n   \033[%u;1H", NETWORKMENU_ROWS+12, 4 + cursor);
       }
     }
     else if (k == KEY_ENTER)
