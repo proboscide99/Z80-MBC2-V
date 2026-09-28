@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------------
 
-S220718-R130826 - HW ref: A060126
+S220718-R280926 - HW ref: A060126
 
 Based on original Z80-MBC2 project version S220718-R290823 IOS
 
@@ -8,10 +8,19 @@ IOS - I/O Subsystem for the  Z80-MBC2-V (Multi Boot Computer - Z80 512kB RAM @ 5
 
 Notes:
 
-1:  This SW is ONLY for the Atmega1284P used as EEPROM and I/O subsystem (20MHz external oscillator) for 
-    the Z80 CPU.
+1:  This SW is for the Atmega1284P used as EEPROM and I/O subsystem (20MHz external oscillator) for the Z80 CPU.
     
 2:  Tested on Atmega1284P @ Arduino IDE 1.8.19 and MightyCore v.2.2.2
+    Settings:
+    Board:          ATmega 1284
+    Clock:          External 20MHz
+    Bod:            Bod 2,7V
+    EEPROM:         EEprom retained
+    Compiler LTO:   LTO Disabled
+    Variant:        1284P
+    Pinout:         Standard Pinout
+    Bootloader:     Yes (UART0)
+
 
 3:  Embedded FW: S200718 iLoad (Intel-Hex loader)
 
@@ -239,6 +248,8 @@ S071225-R020826   Bugfix: F-RAM now initialized before OLED (to properly display
 
 S071225-R130826   Minor changes to the Network Configuration menu'
 
+S071225-R280926   The 'w5500_socket_listen()' routine now drops any byte that could be in the circular RX buffer when previous connection is closed by the client
+
 Tempi pre-modifiche BUSACK controllo pin @8MHz:
 
 CP/M 3.0 --> prompt   8,5 sec
@@ -267,7 +278,7 @@ CICLO for n = 0 to 10000: next = 36,5 sec
 
 #define   HW_REV        "A060126"
 #define   IO_SUBS_BEGIN "S071225"
-#define   IO_SUBS_END   "R130826"
+#define   IO_SUBS_END   "R280926"
 
 // ------------------------------------------------------------------------------
 //

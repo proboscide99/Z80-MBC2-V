@@ -39,6 +39,7 @@
 
 #define Sn_RX_RSR           0x0026
 #define Sn_RX_RD            0x0028
+#define Sn_RX_WR            0x002A
 
 #define Sn_KPALVTR          0x002F
 
@@ -113,10 +114,17 @@
 // ---------------------------------------------------------
 // Socket Command Register values (Sn_CR)
 // ---------------------------------------------------------
+#define CR_OPEN             0x01
+#define CR_LISTEN           0x02
 #define CR_DISCON           0x08
 #define CR_CLOSE            0x10
 #define CR_SEND             0x20
 #define CR_RECV             0x40
+
+// ---------------------------------------------------------
+// Socket Mode Register values (Sn_MR)
+// ---------------------------------------------------------
+#define MR_TCP              0x01
 
 // ---------------------------------------------------------
 // PROXY state machine (real caller's IP detection)
@@ -279,18 +287,34 @@ static void telnet_struct_init(void)
 // ---------------------------------------------------------
 static int8_t w5500_socket_listen(TelnetSession *s)
 {
-  wizWrite(Sn_CR, S_REG(s->sn), 0x10);                                          // CLOSE
+//  telnet_debug_regs(s);                                                       // debug
+//  Serial.printf("rx_head %u, rx_tail %u\r\n", s->rx_head, s->rx_tail);        // debug
+
+  s->rx_tail = s->rx_head;                                                      // discards any byte that could be in the circular buffer
+                                                                                // if client suddenly drops the connection to "WAIT CLOSE"
+/*
+  uint16_t rx_wr = wizRead16(Sn_RX_WR, S_REG(s->sn));                           // alignment of RD/WR W5500 pointers is NOT needed
+  wizWrite16(Sn_RX_RD, S_REG(s->sn), rx_wr);                                    // as it already does that when the socket is opened
+  wizWrite(Sn_CR, S_REG(s->sn), CR_RECV);
+  if (wait_command_done(s->sn))
+  {
+    Serial.printf("[W5500] RECV timeout during flush on socket %u\r\n", s->sn);
+//    return -4;
+  }
+*/
+
+  wizWrite(Sn_CR, S_REG(s->sn), CR_CLOSE);                                      // CLOSE
   if (wait_command_done(s->sn))
   {
     Serial.printf("[W5500] CLOSE timeout on socket %u\r\n", s->sn);
     return -1;
   }
   
-  wizWrite(Sn_MR, S_REG(s->sn), 0x01);                                          // TCP
+  wizWrite(Sn_MR, S_REG(s->sn), MR_TCP);                                        // TCP
 
   wizWrite16(Sn_PORT, S_REG(s->sn), s->port);                                   // PORT
 
-  wizWrite(Sn_CR, S_REG(s->sn), 0x01);                                          // OPEN
+  wizWrite(Sn_CR, S_REG(s->sn), CR_OPEN);                                       // OPEN
   if (wait_command_done(s->sn))
   {
     Serial.printf("[W5500] OPEN timeout on socket %u\r\n", s->sn);
@@ -305,7 +329,7 @@ static int8_t w5500_socket_listen(TelnetSession *s)
 
   wizWrite(Sn_KPALVTR, S_REG(s->sn), 0x0C);                                     // keep alive (5 sec * 0x0C = 1 minute)
 
-  wizWrite(Sn_CR, S_REG(s->sn), 0x02);                                          // LISTEN
+  wizWrite(Sn_CR, S_REG(s->sn), CR_LISTEN);                                     // LISTEN
   if (wait_command_done(s->sn))
   {
     Serial.printf("[W5500] LISTEN timeout on socket %u\r\n", s->sn);
@@ -1412,6 +1436,7 @@ static void telnet_debug_regs(TelnetSession *s)
 {
   uint16_t rxrsr = wizRead16(Sn_RX_RSR, S_REG(s->sn));
   uint16_t rxrd  = wizRead16(Sn_RX_RD,  S_REG(s->sn));
+  uint16_t rxwr  = wizRead16(Sn_RX_WR,  S_REG(s->sn));
 
-  Serial.printf("[W5500] RX_RSR=%u  RX_RD=%u\r\n", rxrsr, rxrd);
+  Serial.printf("[W5500] Socket %u, RX_RSR=%u  RX_RD=%u  RX_WR=%u\r\n", s->sn, rxrsr, rxrd, rxwr);
 }
